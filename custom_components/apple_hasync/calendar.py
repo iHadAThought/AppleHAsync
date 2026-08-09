@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from datetime import date, datetime
 from typing import Any
 
@@ -12,7 +13,8 @@ from homeassistant.components.calendar import (
     CalendarEvent,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -20,6 +22,8 @@ from .const import DOMAIN
 from .coordinator import AppleHASyncCoordinator
 
 _LOGGER = logging.getLogger(__name__)
+_HEX_COLOR = re.compile(r"^#[0-9A-Fa-f]{6}$")
+_CALENDAR_DOMAIN = "calendar"
 
 
 async def async_setup_entry(
@@ -77,6 +81,9 @@ class AppleHASyncCalendar(CoordinatorEntity[AppleHASyncCoordinator], CalendarEnt
         self._attr_name = info.get("title") or calendar_id
         self._attr_unique_id = f"{entry.entry_id}_cal_{calendar_id}"
         self._event: CalendarEvent | None = None
+        # Seed HA calendar color from Mac (entity registry stores it on first add).
+        if color := _normalize_hex_color(info.get("color")):
+            self._attr_initial_color = color
 
     @property
     def available(self) -> bool:
@@ -85,8 +92,41 @@ class AppleHASyncCalendar(CoordinatorEntity[AppleHASyncCoordinator], CalendarEnt
         return self._calendar_id in (self.coordinator.data or {}).get("calendars", {})
 
     @property
+    def initial_color(self) -> str | None:
+        """Mac calendar color as #RRGGBB (Mac is master)."""
+        info = (self.coordinator.data or {}).get("calendars", {}).get(self._calendar_id) or {}
+        if color := _normalize_hex_color(info.get("color")):
+            return color
+        return getattr(self, "_attr_initial_color", None)
+
+    @property
     def event(self) -> CalendarEvent | None:
         return self._event
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        self._sync_mac_color_to_registry()
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        # Keep HA frontend color aligned when the Mac calendar color changes.
+        self._sync_mac_color_to_registry()
+        super()._handle_coordinator_update()
+
+    @callback
+    def _sync_mac_color_to_registry(self) -> None:
+        color = self.initial_color
+        if not color or not self.registry_entry:
+            return
+        registry = er.async_get(self.hass)
+        current = (self.registry_entry.options.get(_CALENDAR_DOMAIN) or {}).get("color")
+        if current == color:
+            return
+        registry.async_update_entity_options(
+            self.entity_id,
+            _CALENDAR_DOMAIN,
+            {**(self.registry_entry.options.get(_CALENDAR_DOMAIN) or {}), "color": color},
+        )
 
     async def async_get_events(
         self,
@@ -153,6 +193,15 @@ class AppleHASyncCalendar(CoordinatorEntity[AppleHASyncCoordinator], CalendarEnt
 
 def _fmt(value: date | datetime) -> str:
     return value.isoformat()
+
+
+def _normalize_hex_color(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    color = value.strip()
+    if _HEX_COLOR.fullmatch(color):
+        return color.lower()
+    return None
 
 
 def _to_calendar_event(item: dict[str, Any]) -> CalendarEvent:

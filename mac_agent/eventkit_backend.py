@@ -44,6 +44,63 @@ def _nsdate_to_dt(nsdate: Any) -> datetime | None:
         return None
 
 
+def _cgcolor_to_hex(cg: Any) -> str | None:
+    """Convert EventKit CGColor / NSColor to #RRGGBB for Home Assistant."""
+    if cg is None:
+        return None
+
+    def _rgb_to_hex(r: float, g: float, b: float) -> str:
+        return (
+            f"#{int(round(max(0.0, min(1.0, r)) * 255)):02x}"
+            f"{int(round(max(0.0, min(1.0, g)) * 255)):02x}"
+            f"{int(round(max(0.0, min(1.0, b)) * 255)):02x}"
+        )
+
+    # Preferred: NSColor bridge (handles color-space conversion)
+    try:
+        from AppKit import NSColor, NSColorSpace
+
+        ns = None
+        try:
+            ns = NSColor.colorWithCGColor_(cg)
+        except Exception:
+            ns = cg if hasattr(cg, "redComponent") else None
+        if ns is not None:
+            rgb = ns.colorUsingColorSpace_(NSColorSpace.sRGBColorSpace())
+            if rgb is not None:
+                return _rgb_to_hex(
+                    float(rgb.redComponent()),
+                    float(rgb.greenComponent()),
+                    float(rgb.blueComponent()),
+                )
+    except Exception:
+        _LOGGER.debug("NSColor hex conversion failed", exc_info=True)
+
+    # Fallback: raw CGColor components (device RGB / sRGB)
+    try:
+        from Quartz import CGColorGetComponents, CGColorGetNumberOfComponents
+
+        n = int(CGColorGetNumberOfComponents(cg))
+        comps = CGColorGetComponents(cg)
+        if n >= 3 and comps is not None:
+            return _rgb_to_hex(float(comps[0]), float(comps[1]), float(comps[2]))
+        if n == 2 and comps is not None:
+            # grayscale + alpha
+            g = float(comps[0])
+            return _rgb_to_hex(g, g, g)
+    except Exception:
+        _LOGGER.debug("CGColor hex conversion failed", exc_info=True)
+
+    return None
+
+
+def _calendar_color_hex(cal: Any) -> str | None:
+    try:
+        return _cgcolor_to_hex(cal.CGColor())
+    except Exception:
+        return None
+
+
 def _dt_to_nsdate(value: datetime | date, EventKit: Any) -> Any:
     from Foundation import NSDate
 
@@ -187,18 +244,11 @@ class EventKitBackend:
             title = str(cal.title() or "")
             source = cal.source()
             source_name = str(source.title()) if source else None
-            color = None
-            try:
-                cg = cal.CGColor()
-                if cg is not None:
-                    color = str(cg)
-            except Exception:
-                pass
             out.append(
                 CalendarSource(
                     id=cid,
                     title=title,
-                    color=color,
+                    color=_calendar_color_hex(cal),
                     source_name=source_name,
                 )
             )
@@ -216,6 +266,7 @@ class EventKitBackend:
                 ReminderList(
                     id=cid,
                     title=title,
+                    color=_calendar_color_hex(cal),
                     source_name=source_name,
                 )
             )

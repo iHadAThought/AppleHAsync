@@ -81,6 +81,7 @@ class AgentConfig:
     reminder_titles: dict[str, str] = field(default_factory=dict)
     agent_token: str = ""
     echo_suppress_seconds: float = 8.0
+    setup_completed: bool = False
 
     def is_calendar_shared(self, calendar_id: str) -> bool:
         return calendar_id in self.shared_calendars
@@ -162,6 +163,7 @@ class ConfigStore:
             reminder_titles=dict(raw.get("reminder_titles") or {}),
             agent_token=agent_token,
             echo_suppress_seconds=float(raw.get("echo_suppress_seconds", 8.0)),
+            setup_completed=bool(raw.get("setup_completed", False)),
         )
         # Persist generated token if missing
         if not self.secrets_path.exists() or not secrets_raw.get("agent_token"):
@@ -182,6 +184,7 @@ class ConfigStore:
             "calendar_titles": self._config.calendar_titles,
             "reminder_titles": self._config.reminder_titles,
             "echo_suppress_seconds": self._config.echo_suppress_seconds,
+            "setup_completed": self._config.setup_completed,
             "home_assistants": [
                 {
                     "id": ha.id,

@@ -178,7 +178,17 @@ if [[ "$SKIP_PERMS" != "1" ]]; then
   "$BIN" permissions open-settings both 2>/dev/null || true
 fi
 
-sleep 2
+echo "==> Waiting for agent health"
+UI_URL="https://127.0.0.1:${LISTEN_PORT}/ui/"
+READY=0
+for _ in $(seq 1 30); do
+  if curl -sk --connect-timeout 2 "https://127.0.0.1:${LISTEN_PORT}/health" | grep -q '"ok"'; then
+    READY=1
+    break
+  fi
+  sleep 1
+done
+
 TOKEN="$("$BIN" token show)"
 IP="$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null || true)"
 
@@ -186,12 +196,26 @@ echo
 echo "==> Installed"
 echo "    Service / Login Items name: ${APP_NAME}"
 echo "    Bundle ID: ${BUNDLE_ID}"
+echo "    Settings UI: ${UI_URL}"
+echo "    LAN health:  https://${IP:-127.0.0.1}:${LISTEN_PORT}/health"
 echo "    Agent token: ${TOKEN}"
-echo "    Health: curl -k https://${IP:-127.0.0.1}:${LISTEN_PORT}/health"
-curl -sk "https://127.0.0.1:${LISTEN_PORT}/health" || true
+if [[ "$READY" == "1" ]]; then
+  curl -sk "https://127.0.0.1:${LISTEN_PORT}/health" || true
+  echo
+  echo "==> Opening setup UI (localhost auto-signs in)"
+  open "$UI_URL" 2>/dev/null || true
+else
+  echo "WARNING: health not ready yet — open ${UI_URL} once the agent is up"
+  echo "  launchctl print ${DOMAIN}/${LABEL} | head"
+  echo "  tail -50 ${INSTALL_DIR}/logs/agent.err.log"
+fi
 echo
-echo "==> Next: share calendars/lists, register HA, add integration in HA UI"
-echo "    ${BIN} share list"
-echo "    ${BIN} ha add --name Home --url https://HA:8123 --token … --webhook-id … --webhook-secret …"
+echo "==> Initial setup in the browser"
+echo "    1. Approve Calendar + Reminders if still prompted"
+echo "    2. Shares tab — enable calendars / reminder lists"
+echo "    3. Home Assistant tab — add URL + long-lived token, Test connection, Save"
+echo "    4. Copy agent token into HA → Add integration → Apple HA Sync"
+echo "    5. Mark setup complete"
 echo
+echo "==> Later edits: open ${UI_URL} (or https://${IP:-127.0.0.1}:${LISTEN_PORT}/ui/)"
 echo "==> Later updates:  ${INSTALL_DIR}/deploy/update-mac-agent.sh"

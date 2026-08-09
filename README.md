@@ -39,8 +39,10 @@ This installs:
 
 Approve **Calendars** and **Reminders** Full Access for **appleHAsync** when prompted.
 
+The installer opens the **settings UI** at `https://127.0.0.1:8745/ui/` (localhost auto-signs in). Use it for initial setup: shares, Home Assistant (with **Test connection**), and agent options. Re-open that URL anytime to edit settings.
+
 ```bash
-# After install — CLI is the app binary
+# Optional CLI (same app binary)
 ~/Applications/appleHAsync.app/Contents/MacOS/appleHAsync share list
 ~/Applications/appleHAsync.app/Contents/MacOS/appleHAsync token show
 ```

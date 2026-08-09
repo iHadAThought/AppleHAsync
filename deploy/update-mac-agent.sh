@@ -227,5 +227,6 @@ echo
 echo "==> Update complete"
 echo "    revision: ${AFTER_REV}"
 echo "    binary:   ${BIN}"
+echo "    Settings: https://127.0.0.1:8745/ui/"
 echo "    Optional: REPAIR_SHARES=1 $0   # if HA entities went unavailable after iCloud ID churn"
 echo "    HA: reload Apple HA Sync after share changes"

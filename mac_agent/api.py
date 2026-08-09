@@ -107,6 +107,13 @@ class HaUpdate(BaseModel):
     enabled: bool | None = None
 
 
+class HaTestBody(BaseModel):
+    base_url: str
+    token: str = ""
+    verify_tls: bool = True
+    ca_path: str | None = None
+
+
 class EventCreateBody(BaseModel):
     summary: str
     start: str
@@ -218,6 +225,17 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="appleHAsync Mac Agent", version="0.1.0", lifespan=lifespan)
+
+from .webui import build_ui_router, mount_static  # noqa: E402
+
+app.include_router(
+    build_ui_router(
+        get_store=get_store,
+        require_auth=require_auth,
+        backend_getter=lambda: backend,
+    )
+)
+mount_static(app)
 
 
 @app.get("/health")
@@ -593,10 +611,28 @@ async def admin_ha_test(key: str):
     return result
 
 
+@app.post("/v1/admin/home-assistants/test", dependencies=[Depends(require_auth)])
+async def admin_ha_test_body(body: HaTestBody):
+    """Test HA credentials without saving (settings UI)."""
+    st = get_store()
+    return await test_ha_connection(
+        base_url=body.base_url.rstrip("/"),
+        token=body.token,
+        verify_tls=body.verify_tls,
+        ca_path=body.ca_path,
+        allow_insecure_http=st.config.allow_insecure_http or not body.verify_tls,
+    )
+
+
 @app.post("/v1/admin/token/rotate", dependencies=[Depends(require_auth)])
 async def admin_token_rotate():
     token = get_store().rotate_agent_token()
     return {"agent_token": token}
+
+
+@app.get("/v1/admin/token", dependencies=[Depends(require_auth)])
+async def admin_token_show():
+    return {"agent_token": get_store().config.agent_token}
 
 
 @app.exception_handler(KeyError)

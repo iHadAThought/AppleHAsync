@@ -4,25 +4,26 @@
 # Usage (from a clone):
 #   ./deploy/install-mac-agent.sh
 #
-# Usage (curl | bash, private Forgejo needs auth or a local clone):
-#   curl -fsSL …/deploy/install-mac-agent.sh | bash
+# Usage (curl | bash):
+#   curl -fsSL https://raw.githubusercontent.com/iHadAThought/AppleHAsync/main/deploy/install-mac-agent.sh | bash
 #
 # Result:
 #   - Code in ~/appleHAsync (or INSTALL_DIR)
 #   - App: ~/Applications/appleHAsync.app  (shows as "appleHAsync" in Privacy + Login Items)
-#   - LaunchAgent: app.ghostnetwork.appleHAsync (Background Items / Login Items)
+#   - LaunchAgent: app.iHadAThought.appleHAsync (Background Items / Login Items)
 #
 set -euo pipefail
 
-BUNDLE_ID="app.ghostnetwork.appleHAsync"
+BUNDLE_ID="app.iHadAThought.appleHAsync"
 APP_NAME="appleHAsync"
 LABEL="$BUNDLE_ID"
-REPO_URL="${REPO_URL:-https://git.ghostnetwork.app/Brendan/appleHAsync.git}"
+REPO_URL="${REPO_URL:-https://github.com/iHadAThought/AppleHAsync.git}"
 INSTALL_DIR="${INSTALL_DIR:-$HOME/appleHAsync}"
 APP_DIR="${APP_DIR:-$HOME/Applications/appleHAsync.app}"
 DATA_DIR="${APPLE_HASYNC_DATA_DIR:-$HOME/Library/Application Support/appleHAsync}"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
-LISTEN_HOST="${LISTEN_HOST:-0.0.0.0}"
+# Default loopback; set LISTEN_HOST=0.0.0.0 explicitly for LAN access from HA.
+LISTEN_HOST="${LISTEN_HOST:-127.0.0.1}"
 LISTEN_PORT="${LISTEN_PORT:-8745}"
 SKIP_PERMS="${SKIP_PERMS:-0}"
 
@@ -106,7 +107,7 @@ fi
 # Stop old agent labels (previous name + current)
 UID_NUM="$(id -u)"
 DOMAIN="gui/${UID_NUM}"
-for old in app.ghostnetwork.applehasync "$LABEL"; do
+for old in app.ghostnetwork.appleHAsync app.ghostnetwork.applehasync "$LABEL"; do
   launchctl bootout "${DOMAIN}/${old}" 2>/dev/null || true
   rm -f "$HOME/Library/LaunchAgents/${old}.plist"
 done

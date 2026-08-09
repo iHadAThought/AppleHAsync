@@ -68,13 +68,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     ) -> Response:
         body = await request.read()
         signature = request.headers.get("X-Apple-HASync-Signature", "")
-        if secret:
-            expected = hmac.new(
-                secret.encode("utf-8"), body, hashlib.sha256
-            ).hexdigest()
-            if not hmac.compare_digest(expected, signature or ""):
-                _LOGGER.warning("Rejected webhook with invalid HMAC")
-                return Response(status=401, text="invalid signature")
+        # Require a configured secret — unsigned refresh would let any LAN client
+        # trigger polling if the webhook URL were guessed.
+        if not secret:
+            _LOGGER.error("Webhook secret missing; rejecting refresh")
+            return Response(status=401, text="webhook secret not configured")
+        expected = hmac.new(
+            secret.encode("utf-8"), body, hashlib.sha256
+        ).hexdigest()
+        if not hmac.compare_digest(expected, signature or ""):
+            _LOGGER.warning("Rejected webhook with invalid HMAC")
+            return Response(status=401, text="invalid signature")
         coordinator.request_refresh_from_webhook()
         return Response(status=200, text="ok")
 

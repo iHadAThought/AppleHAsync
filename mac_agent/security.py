@@ -102,6 +102,8 @@ def build_ssl_context(
 
 
 def client_ip_allowed(client_ip: str | None, allowlist: list[str]) -> bool:
+    # Empty allowlist intentionally allows all clients (not fail-closed). Prefer
+    # binding to 127.0.0.1 or setting explicit CIDRs when exposing on LAN.
     if not allowlist:
         return True
     if not client_ip:
@@ -167,7 +169,10 @@ async def post_ha_webhook(
     if not webhook_id:
         return {"ok": False, "error": "webhook_id not configured"}
     verify: bool | str = ca_path if ca_path else verify_tls
-    sig = hmac_sha256_hex(webhook_secret, payload) if webhook_secret else ""
+    # HA rejects refreshes without a configured secret; always sign when set.
+    if not webhook_secret:
+        return {"ok": False, "error": "webhook_secret not configured"}
+    sig = hmac_sha256_hex(webhook_secret, payload)
     headers = {
         "Content-Type": "application/json",
         "X-Apple-HASync-Signature": sig,

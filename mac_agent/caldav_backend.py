@@ -1,4 +1,4 @@
-"""CalDAV backend groundwork — not implemented for v1."""
+"""CalDAV backend stub — not shipped in public v1 (EventKit local agent only)."""
 
 from __future__ import annotations
 
@@ -16,10 +16,7 @@ from shared.models import (
 
 
 class CalDAVBackend:
-    """Placeholder for future iCloud/CalDAV backend (plan option B).
-
-    Implement the same method surface as EventKitBackend / shared.Backend.
-    """
+    """Placeholder only — do not wire into the Mac agent API or HA UI yet."""
 
     backend_id = "caldav"
 

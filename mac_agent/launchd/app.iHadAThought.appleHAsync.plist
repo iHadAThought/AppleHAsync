@@ -4,15 +4,15 @@
 <!--
   Template only — prefer deploy/install-mac-agent.sh which writes a fully
   resolved plist pointing at ~/Applications/appleHAsync.app.
-  Label / AssociatedBundleIdentifiers must stay app.ghostnetwork.appleHAsync
+  Label / AssociatedBundleIdentifiers must stay app.iHadAThought.appleHAsync
   so Login Items & Extensions show "appleHAsync".
 -->
 <dict>
   <key>Label</key>
-  <string>app.ghostnetwork.appleHAsync</string>
+  <string>app.iHadAThought.appleHAsync</string>
   <key>AssociatedBundleIdentifiers</key>
   <array>
-    <string>app.ghostnetwork.appleHAsync</string>
+    <string>app.iHadAThought.appleHAsync</string>
   </array>
   <key>ProgramArguments</key>
   <array>

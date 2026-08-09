@@ -59,6 +59,7 @@ class AppleHASyncCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         return list(data) if data is not None else None
 
     def mark_echo(self, kind: str, uid: str, seconds: float = 8.0) -> None:
+        # Mirror Mac sync_meta: ignore our own writes briefly to avoid loops.
         self._echo_until[f"{kind}:{uid}"] = time.time() + seconds
 
     def is_echo(self, kind: str, uid: str) -> bool:

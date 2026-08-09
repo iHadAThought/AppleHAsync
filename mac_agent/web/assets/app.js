@@ -303,7 +303,7 @@
     setLoggedIn(true);
     const host = location.hostname;
     const port = location.port || (location.protocol === "https:" ? "443" : "80");
-    $("agent-url-hint").textContent = `Agent URL for HA: ${location.protocol}//${host === "127.0.0.1" || host === "localhost" ? "(Mac LAN IP)" : host}:${port}  e.g. https://172.16.1.3:8745`;
+    $("agent-url-hint").textContent = `Agent URL for HA: ${location.protocol}//${host === "127.0.0.1" || host === "localhost" ? "(Mac LAN IP)" : host}:${port}  e.g. https://127.0.0.1:8745`;
     $("header-sub").textContent = bootstrap?.setup_needed
       ? "Finish initial setup"
       : "Settings";

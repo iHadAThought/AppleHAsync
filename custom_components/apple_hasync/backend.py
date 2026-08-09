@@ -39,11 +39,11 @@ class BackendClient(Protocol):
 
 
 class CalDAVBackendClient:
-    """Reserved for future CalDAV / iCloud support."""
+    """Reserved stub — not shipped in the public v1 UI (Local Mac Agent only)."""
 
     def __init__(self, *_args, **_kwargs) -> None:
         raise NotImplementedError(
-            "CalDAV backend is not available yet. Choose Local Mac Agent."
+            "CalDAV backend is not available. Use Local Mac Agent."
         )
 
 

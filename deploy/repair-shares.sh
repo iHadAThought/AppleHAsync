@@ -1,6 +1,6 @@
 #!/bin/bash
 # Repair stale EventKit share IDs (common after iCloud re-sync) and print
-# what HA should select. Run ON m2server.
+# what HA should select. Run on the Mac that hosts the agent.
 set -euo pipefail
 
 ROOT="${APPLE_HASYNC_ROOT:-$HOME/appleHAsync}"
@@ -8,6 +8,7 @@ BIN="${BIN:-$HOME/Applications/appleHAsync.app/Contents/MacOS/appleHAsync}"
 DATA_DIR="${APPLE_HASYNC_DATA_DIR:-$HOME/Library/Application Support/appleHAsync}"
 # Share all iCloud calendars + all reminder lists by default
 SHARE_ALL="${SHARE_ALL:-1}"
+AGENT_PORT="${AGENT_PORT:-8745}"
 
 if [[ ! -x "$BIN" ]]; then
   echo "ERROR: app binary missing: $BIN" >&2
@@ -22,10 +23,8 @@ echo "==> Current sources"
 "$BIN" share list
 
 echo "==> Rebuild shares (drop stale IDs)"
-# Use venv python for a precise repair against live EventKit + config
 "$ROOT/.venv/bin/python" - <<'PY'
 import os, sys
-from pathlib import Path
 sys.path.insert(0, os.environ["APPLE_HASYNC_ROOT"])
 from mac_agent.config import ConfigStore
 from mac_agent.eventkit_backend import EventKitBackend
@@ -73,13 +72,12 @@ PY
 
 echo "==> Verify API"
 TOK=$("$BIN" token show)
-curl -sk -H "Authorization: Bearer $TOK" https://127.0.0.1:8745/v1/calendars | python3 -m json.tool | head -40
-curl -sk -H "Authorization: Bearer $TOK" https://127.0.0.1:8745/v1/reminder-lists | python3 -m json.tool | head -40
-curl -sk https://127.0.0.1:8745/health | python3 -m json.tool | head -20
+curl -sk -H "Authorization: Bearer $TOK" "https://127.0.0.1:${AGENT_PORT}/v1/calendars" | python3 -m json.tool | head -40
+curl -sk -H "Authorization: Bearer $TOK" "https://127.0.0.1:${AGENT_PORT}/v1/reminder-lists" | python3 -m json.tool | head -40
+curl -sk "https://127.0.0.1:${AGENT_PORT}/health" | python3 -m json.tool | head -20
 
 echo
 echo "==> Next in Home Assistant"
-echo "  Settings → Devices & services → Apple HA Sync → Configure/Reload"
-echo "  (or Delete + Add again with agent URL/token; pick the shared sources)"
-echo "  Agent: https://172.16.1.3:8745"
-echo "  Token: $TOK"
+echo "  Settings → Devices & services → Apple HA Sync → Configure / Reload"
+echo "  Agent URL example: https://<mac-lan-ip>:${AGENT_PORT}"
+echo "  Use: $BIN token show   (do not paste tokens into shared logs)"

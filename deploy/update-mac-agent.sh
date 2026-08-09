@@ -19,9 +19,9 @@
 #
 set -euo pipefail
 
-BUNDLE_ID="app.ghostnetwork.appleHAsync"
+BUNDLE_ID="app.iHadAThought.appleHAsync"
 LABEL="$BUNDLE_ID"
-REPO_URL="${REPO_URL:-https://git.ghostnetwork.app/Brendan/appleHAsync.git}"
+REPO_URL="${REPO_URL:-https://github.com/iHadAThought/AppleHAsync.git}"
 INSTALL_DIR="${INSTALL_DIR:-$HOME/appleHAsync}"
 APP_DIR="${APP_DIR:-$HOME/Applications/appleHAsync.app}"
 DATA_DIR="${APPLE_HASYNC_DATA_DIR:-$HOME/Library/Application Support/appleHAsync}"
@@ -193,6 +193,10 @@ fi
 
 if [[ "$SKIP_RESTART" != "1" ]]; then
   echo "==> Restart LaunchAgent ${LABEL}"
+  for old in app.ghostnetwork.appleHAsync app.ghostnetwork.applehasync; do
+    launchctl bootout "${DOMAIN}/${old}" 2>/dev/null || true
+    rm -f "$HOME/Library/LaunchAgents/${old}.plist"
+  done
   launchctl bootout "${DOMAIN}/${LABEL}" 2>/dev/null || true
   # Refresh plist paths in case install dir / app moved
   /usr/libexec/PlistBuddy -c "Set :ProgramArguments:0 ${BIN}" "$PLIST" 2>/dev/null || true

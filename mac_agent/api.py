@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hmac
 import logging
 import sys
 import time
@@ -183,16 +184,21 @@ async def require_auth(
     request: Request,
     authorization: str | None = Header(default=None),
 ) -> None:
+    """IP allowlist first, then bearer token (constant-time compare)."""
     cfg = get_store().config
     client = request.client.host if request.client else None
     _rate_limit_auth(client)
+    # Empty allowlist means "any IP" — pair with listen_host=127.0.0.1 or a tight list.
     if not client_ip_allowed(client, cfg.allowed_source_ips):
         raise HTTPException(status_code=403, detail="source_ip_not_allowed")
     if not authorization or not authorization.lower().startswith("bearer "):
         _record_auth_failure(client)
         raise HTTPException(status_code=401, detail="missing_bearer_token")
     token = authorization.split(" ", 1)[1].strip()
-    if token != cfg.agent_token:
+    expected = (cfg.agent_token or "").encode("utf-8")
+    got = token.encode("utf-8")
+    # Length mismatch must not raise — treat as invalid token.
+    if len(got) != len(expected) or not hmac.compare_digest(got, expected):
         _record_auth_failure(client)
         raise HTTPException(status_code=401, detail="invalid_token")
 
@@ -266,7 +272,15 @@ async def lifespan(app: FastAPI):
         meta.close()
 
 
-app = FastAPI(title="appleHAsync Mac Agent", version="0.1.0", lifespan=lifespan)
+app = FastAPI(
+    title="appleHAsync Mac Agent",
+    version="0.1.3",
+    lifespan=lifespan,
+    # Production agent: do not expose interactive OpenAPI docs.
+    docs_url=None,
+    redoc_url=None,
+    openapi_url=None,
+)
 
 from .webui import build_ui_router, mount_static  # noqa: E402
 
@@ -282,7 +296,7 @@ mount_static(app)
 
 @app.get("/health")
 async def health():
-    cfg = get_store().config
+    """Unauthenticated liveness — keep the payload minimal (no share/HA recon)."""
     perms = backend.get_permissions().to_dict() if backend else {
         "calendar": "unavailable",
         "reminders": "unavailable",
@@ -291,12 +305,6 @@ async def health():
         "ok": True,
         "backend": "eventkit" if backend else None,
         "permissions": perms,
-        "shared_calendars": len(cfg.shared_calendars),
-        "shared_reminder_lists": len(cfg.shared_reminder_lists),
-        "home_assistants": len([h for h in cfg.home_assistants if h.enabled]),
-        "allow_insecure_http": cfg.allow_insecure_http,
-        "tls_configured": bool(cfg.tls_cert_file and cfg.tls_key_file),
-        "last_webhooks": notifier.last_results if notifier else [],
     }
 
 

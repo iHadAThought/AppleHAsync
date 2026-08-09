@@ -90,5 +90,5 @@ codesign --force --deep --sign - "$APP_DIR" 2>/dev/null || true
   -f "$APP_DIR" 2>/dev/null || true
 
 echo "==> Built $APP_DIR"
-echo "    id: app.ghostnetwork.appleHAsync"
+echo "    id: app.iHadAThought.appleHAsync"
 echo "    name: appleHAsync"

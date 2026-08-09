@@ -14,10 +14,10 @@
 #
 set -euo pipefail
 
-BUNDLE_ID="app.ghostnetwork.appleHAsync"
+BUNDLE_ID="app.iHadAThought.appleHAsync"
 APP_NAME="appleHAsync"
 LABEL="$BUNDLE_ID"
-OLD_LABEL="app.ghostnetwork.applehasync"
+OLD_LABELS=("app.ghostnetwork.appleHAsync" "app.ghostnetwork.applehasync")
 INSTALL_DIR="${INSTALL_DIR:-$HOME/appleHAsync}"
 APP_DIR="${APP_DIR:-$HOME/Applications/appleHAsync.app}"
 DATA_DIR="${APPLE_HASYNC_DATA_DIR:-$HOME/Library/Application Support/appleHAsync}"
@@ -65,7 +65,7 @@ UID_NUM="$(id -u)"
 DOMAIN="gui/${UID_NUM}"
 
 echo "==> Stop LaunchAgent"
-for lbl in "$LABEL" "$OLD_LABEL"; do
+for lbl in "$LABEL" "${OLD_LABELS[@]}"; do
   launchctl bootout "${DOMAIN}/${lbl}" 2>/dev/null || true
   launchctl disable "${DOMAIN}/${lbl}" 2>/dev/null || true
   rm -f "$HOME/Library/LaunchAgents/${lbl}.plist"

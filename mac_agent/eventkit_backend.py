@@ -427,8 +427,9 @@ class EventKitBackend:
 
     def reset_tcc(self, which: str = "both") -> None:
         """Reset TCC entries so the system prompt can appear again."""
-        # Prefer resetting only appleHAsync.app; fall back to service-wide.
-        bundle_id = "app.ghostnetwork.appleHAsync"
+        # Prefer resetting only this app. If that fails, tccutil falls back to a
+        # SERVICE-WIDE reset (all apps lose Calendar/Reminders grants) — dangerous.
+        bundle_id = "app.iHadAThought.appleHAsync"
         services = []
         if which in ("both", "calendar", "calendars"):
             services.append("Calendar")
@@ -441,6 +442,10 @@ class EventKitBackend:
                 capture_output=True,
             )
             if r.returncode != 0:
+                _LOGGER.warning(
+                    "Bundle TCC reset failed for %s; falling back to service-wide reset",
+                    svc,
+                )
                 subprocess.run(["tccutil", "reset", svc], check=False)
 
     def list_calendars(self, *, shared_only: bool = False) -> list[CalendarSource]:

@@ -53,7 +53,11 @@ def build_ui_router(
 
     @router.get("/v1/setup/bootstrap")
     async def setup_bootstrap(request: Request):
-        """Loopback-only: hand the agent token to the local setup UI."""
+        """Loopback-only auto-login for the settings UI.
+
+        Any process on the Mac can call this without a bearer token — that is
+        intentional for first-run UX. Remote clients always get 403.
+        """
         if not _is_loopback(request):
             raise HTTPException(status_code=403, detail="loopback_only")
         st: ConfigStore = get_store()

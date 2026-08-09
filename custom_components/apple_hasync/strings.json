@@ -3,9 +3,8 @@
     "step": {
       "user": {
         "title": "Connect to Mac appleHAsync agent",
-        "description": "Use the HTTPS URL and agent token from the Mac Mini. CalDAV is reserved for later.",
+        "description": "Use the HTTPS URL and agent token from the Mac agent settings UI or CLI.",
         "data": {
-          "backend": "Backend",
           "agent_url": "Agent base URL",
           "agent_token": "Agent bearer token",
           "verify_tls": "Verify TLS certificate",
@@ -31,7 +30,7 @@
     },
     "abort": {
       "already_configured": "This agent URL is already configured",
-      "caldav_not_available": "CalDAV / iCloud backend is not available yet"
+      "caldav_not_available": "This backend is not available"
     }
   },
   "options": {

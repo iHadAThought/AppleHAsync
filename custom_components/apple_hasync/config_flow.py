@@ -34,10 +34,6 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
-_OptionsBase = getattr(
-    config_entries, "OptionsFlowWithConfigEntry", config_entries.OptionsFlow
-)
-
 
 class AppleHASyncConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for apple_hasync."""
@@ -54,6 +50,7 @@ class AppleHASyncConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     ) -> FlowResult:
         errors: dict[str, str] = {}
         if user_input is not None:
+            # Safety: reject legacy CalDAV selections if present in stored drafts.
             backend = user_input.get(CONF_BACKEND, BACKEND_LOCAL_AGENT)
             if backend == BACKEND_CALDAV:
                 return self.async_abort(reason="caldav_not_available")
@@ -103,18 +100,6 @@ class AppleHASyncConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         schema = vol.Schema(
             {
-                vol.Required(CONF_BACKEND, default=BACKEND_LOCAL_AGENT): selector.SelectSelector(
-                    selector.SelectSelectorConfig(
-                        options=[
-                            {"value": BACKEND_LOCAL_AGENT, "label": "Local Mac Agent"},
-                            {
-                                "value": BACKEND_CALDAV,
-                                "label": "CalDAV / iCloud (coming soon)",
-                            },
-                        ],
-                        mode=selector.SelectSelectorMode.DROPDOWN,
-                    )
-                ),
                 vol.Required(CONF_AGENT_URL): str,
                 vol.Required(CONF_AGENT_TOKEN): str,
                 vol.Optional(CONF_VERIFY_TLS, default=True): bool,
@@ -191,19 +176,12 @@ class AppleHASyncConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     @staticmethod
     @callback
     def async_get_options_flow(config_entry: config_entries.ConfigEntry):
-        return AppleHASyncOptionsFlow(config_entry)
+        # HA 2025.12+: do not pass/assign config_entry — it is injected read-only.
+        return AppleHASyncOptionsFlow()
 
 
-class AppleHASyncOptionsFlow(_OptionsBase):
-    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
-        # OptionsFlowWithConfigEntry takes config_entry; plain OptionsFlow may not.
-        try:
-            super().__init__(config_entry)
-        except TypeError:
-            super().__init__()
-            self.config_entry = config_entry
-        if not hasattr(self, "config_entry"):
-            self.config_entry = config_entry
+class AppleHASyncOptionsFlow(config_entries.OptionsFlow):
+    """Options gear flow — uses inherited self.config_entry (HA 2024.12+)."""
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None

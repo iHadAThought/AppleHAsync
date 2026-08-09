@@ -1,4 +1,9 @@
-"""SQLite sync metadata for content hashes / echo suppression."""
+"""SQLite sync metadata for content hashes / echo suppression.
+
+Echo suppression records UIDs we just wrote so inbound EventKit change
+notifications (or HA webhook refreshes) do not immediately bounce the same
+edit back and create a write loop. Windows are short (seconds).
+"""
 
 from __future__ import annotations
 

@@ -1,94 +1,86 @@
 # appleHAsync
 
-Sync **macOS Calendar & Reminders** (EventKit) to Home Assistant. macOS is the master copy; HA edits apply as field-level patches only.
+<p align="center">
+  <img src="docs/images/icon.png" alt="Apple HA Sync" width="160" />
+</p>
 
-Setup and operations live in BookStack: **[appleHAsync](https://bookstack.ghostnetwork.app/books/applehasync)**
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
+[![GitHub release](https://img.shields.io/github/v/release/iHadAThought/AppleHAsync)](https://github.com/iHadAThought/AppleHAsync/releases)
 
-## Layout
+Sync **macOS Calendar & Reminders** (EventKit) to Home Assistant. The Mac is the master copy; HA edits apply as field-level patches only.
 
-| Path | Role |
-|------|------|
-| `mac_agent/` | Always-on Mac Mini companion (EventKit + HTTPS API + CLI) |
-| `mac_agent/macos_app/` | `appleHAsync.app` builder (TCC / Login Items identity) |
-| `custom_components/apple_hasync/` | Home Assistant integration (`calendar` + `todo`) |
-| `shared/` | Shared domain models / backend protocol |
-| `deploy/install-mac-agent.sh` | One-click Mac installer |
-| `deploy/update-mac-agent.sh` | One-click Mac update / patch |
-| `deploy/uninstall-mac-agent.sh` | One-click Mac uninstaller |
+Full install/update guide: **[docs/INSTALL.md](docs/INSTALL.md)**
 
-## One-click Mac install
+## Architecture
 
-On the Mac Mini (clone first if the Forgejo repo is private):
+| Piece | Role |
+|-------|------|
+| `mac_agent/` | Always-on Mac companion (EventKit + HTTPS API + settings UI + CLI) |
+| `custom_components/apple_hasync/` | Home Assistant integration (`calendar` + `todo`) — installable via HACS |
+| `shared/` | Shared domain models |
+| `deploy/` | One-click Mac install / update / uninstall helpers |
+
+HACS installs **only** the Home Assistant component. The Mac agent requires cloning this repository on a Mac.
+
+## Requirements
+
+- macOS 13+ with Calendar and Reminders **Full Access** for **appleHAsync**
+- Home Assistant **2025.12+** (options flow API)
+- Network path between the Mac agent and Home Assistant
+
+## Home Assistant (HACS)
+
+1. HACS → Integrations → ⋮ → **Custom repositories**
+2. Repository: `https://github.com/iHadAThought/AppleHAsync`
+3. Category: **Integration**
+4. Download **Apple HA Sync** → restart Home Assistant
+5. Settings → Devices & services → **Add integration** → Apple HA Sync
+6. Enter the Mac agent URL + bearer token (from the Mac settings UI or `token show`)
+
+Manual install: copy `custom_components/apple_hasync` into your HA `config/custom_components/` directory, then restart.
+
+## Mac agent (one-click)
 
 ```bash
-git clone https://git.ghostnetwork.app/Brendan/appleHAsync.git ~/appleHAsync
-~/appleHAsync/deploy/install-mac-agent.sh
-```
-
-Or from an existing checkout:
-
-```bash
-./deploy/install-mac-agent.sh
+git clone https://github.com/iHadAThought/AppleHAsync.git ~/appleHAsync
+# For HA on another machine, bind the LAN interface:
+LISTEN_HOST=0.0.0.0 ~/appleHAsync/deploy/install-mac-agent.sh
 ```
 
 This installs:
 
 - Code + venv → `~/appleHAsync`
-- App → `~/Applications/appleHAsync.app` (shows as **appleHAsync** in Calendars, Reminders, and Login Items & Extensions)
-- LaunchAgent → `app.ghostnetwork.appleHAsync` (runs at login / KeepAlive)
+- App → `~/Applications/appleHAsync.app`
+- LaunchAgent → `app.iHadAThought.appleHAsync`
 
-Approve **Calendars** and **Reminders** Full Access for **appleHAsync** when prompted.
+Approve **Calendars** and **Reminders** Full Access when prompted. The installer opens `https://127.0.0.1:8745/ui/`.
 
-The installer opens the **settings UI** at `https://127.0.0.1:8745/ui/` (localhost auto-signs in). Use it for initial setup: shares, Home Assistant (with **Test connection**), and agent options. Re-open that URL anytime to edit settings.
-
-```bash
-# Optional CLI (same app binary)
-~/Applications/appleHAsync.app/Contents/MacOS/appleHAsync share list
-~/Applications/appleHAsync.app/Contents/MacOS/appleHAsync token show
-```
-
-## One-click Mac uninstall
-
-```bash
-~/appleHAsync/deploy/uninstall-mac-agent.sh
-# Full wipe (app + LaunchAgent + code + Application Support + TCC):
-PURGE=1 ~/appleHAsync/deploy/uninstall-mac-agent.sh --force
-```
-
-Then remove **Apple HA Sync** under HA → Settings → Devices & services if desired.
-
-## One-click Mac update
+### Update / uninstall
 
 ```bash
 ~/appleHAsync/deploy/update-mac-agent.sh
+# Optional: ~/appleHAsync/deploy/update-mac-agent.sh --repair-shares
+
+~/appleHAsync/deploy/uninstall-mac-agent.sh
+PURGE=1 ~/appleHAsync/deploy/uninstall-mac-agent.sh --force
 ```
 
-Pulls from Forgejo, refreshes the venv, rebuilds `appleHAsync.app`, restarts the LaunchAgent. Config/secrets/shares are kept.
+After updating from an older install that used `app.ghostnetwork.appleHAsync`, re-check Calendar/Reminders permissions for **appleHAsync**.
 
-```bash
-# Also repair stale EventKit share IDs (if HA entities went unavailable):
-~/appleHAsync/deploy/update-mac-agent.sh --repair-shares
-```
+## Pairing checklist
 
-## Manual / advanced Mac commands
-
-```bash
-export PATH="$HOME/Applications/appleHAsync.app/Contents/MacOS:$PATH"
-appleHAsync permissions status
-appleHAsync share enable calendar <CALENDAR_ID>
-appleHAsync share enable reminder_list <LIST_ID>
-appleHAsync ha add --name Home --url https://HOMEASSISTANT:8123 \
-  --token LONG_LIVED_TOKEN --webhook-id apple_hasync_ENTRYID --webhook-secret SECRET
-appleHAsync ha test Home
-```
-
-## Quick start (Home Assistant)
-
-1. Copy `custom_components/apple_hasync` into HA `config/custom_components/`.
-2. Restart HA → Settings → Devices & services → Add **Apple HA Sync**.
-3. Enter agent HTTPS URL + agent token (TLS verify on by default).
-4. Call service `apple_hasync.get_pairing_info` and paste `webhook_id` / `webhook_secret` into the Mac HA registry.
+1. Share calendars/lists (and optional field sync) on the Mac **Shares** tab
+2. Add Apple HA Sync in HA with agent URL + token
+3. Run HA service `apple_hasync.get_pairing_info` and register webhook id/secret on the Mac **Home Assistant** tab
 
 ## Security
 
-HTTPS by default, bearer tokens both ways, HMAC-signed webhooks, fail-closed share allowlist, secrets file mode `0600`. See BookStack for TLS/certs and firewall notes.
+- HTTPS by default (self-signed cert generated locally); bearer tokens both ways
+- HMAC-signed webhooks (required)
+- Fail-closed share allowlist (nothing shared until you enable it)
+- Installer defaults to `LISTEN_HOST=127.0.0.1` — set `0.0.0.0` only when HA needs LAN access, and prefer an IP allowlist
+
+## License
+
+MIT — see [LICENSE](LICENSE).

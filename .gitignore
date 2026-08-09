@@ -1,5 +1,6 @@
 # Local secrets / runtime data (never commit)
 **/secrets.yaml
+**/config.yaml
 **/.DS_Store
 __pycache__/
 *.py[cod]
@@ -8,6 +9,7 @@ __pycache__/
 venv/
 .env
 logs/
+*.log
 *.sqlite3
 *.sqlite3-*
 

@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>appleHAsync</title>
+  <link rel="stylesheet" href="/ui/assets/styles.css" />
+</head>
+<body>
+  <div class="shell">
+    <header class="top">
+      <div>
+        <p class="brand">appleHAsync</p>
+        <p class="sub" id="header-sub">Mac agent settings</p>
+      </div>
+      <div class="top-actions">
+        <span class="pill" id="health-pill">…</span>
+        <button type="button" class="ghost" id="btn-logout" hidden>Sign out</button>
+      </div>
+    </header>
+
+    <section id="view-login" class="panel" hidden>
+      <h1>Sign in</h1>
+      <p class="lede">Enter the agent token from install (or Terminal: <code>appleHAsync token show</code>).</p>
+      <label>Agent token
+        <input id="login-token" type="password" autocomplete="off" spellcheck="false" />
+      </label>
+      <p class="err" id="login-err" hidden></p>
+      <button type="button" class="primary" id="btn-login">Continue</button>
+    </section>
+
+    <section id="view-app" hidden>
+      <nav class="tabs" role="tablist">
+        <button type="button" class="tab active" data-tab="setup">Setup</button>
+        <button type="button" class="tab" data-tab="shares">Shares</button>
+        <button type="button" class="tab" data-tab="ha">Home Assistant</button>
+        <button type="button" class="tab" data-tab="agent">Agent</button>
+      </nav>
+
+      <div class="tab-panels">
+        <section class="panel tab-panel active" id="tab-setup">
+          <h1>Initial setup</h1>
+          <p class="lede">Grant access, pick what to sync, then connect Home Assistant.</p>
+          <ol class="checklist" id="setup-checklist">
+            <li id="check-perms">Calendar &amp; Reminders permission</li>
+            <li id="check-shares">At least one shared calendar or list</li>
+            <li id="check-ha">Home Assistant registered</li>
+          </ol>
+          <div class="row">
+            <button type="button" class="primary" id="btn-request-perms">Request permissions</button>
+            <button type="button" class="ghost" id="btn-open-privacy">Open Privacy settings</button>
+          </div>
+          <p class="muted" id="perms-status"></p>
+          <div class="box">
+            <h2>Agent token for HA</h2>
+            <p class="muted">Paste this into the Apple HA Sync integration (with agent URL).</p>
+            <div class="token-row">
+              <code id="setup-token">—</code>
+              <button type="button" class="ghost" id="btn-copy-token">Copy</button>
+            </div>
+            <p class="muted" id="agent-url-hint"></p>
+          </div>
+          <button type="button" class="primary" id="btn-finish-setup">Mark setup complete</button>
+        </section>
+
+        <section class="panel tab-panel" id="tab-shares">
+          <h1>Shared sources</h1>
+          <p class="lede">Enable a calendar or reminder list, then choose which details sync to Home Assistant for that source.</p>
+          <div class="row">
+            <button type="button" class="ghost" id="btn-refresh-shares">Refresh</button>
+            <button type="button" class="primary" id="btn-save-shares">Save shares</button>
+          </div>
+          <p class="err" id="shares-err" hidden></p>
+          <h2>Calendars</h2>
+          <p class="muted">Always syncs title, start, and end. Optional: notes, location, URL.</p>
+          <div id="calendars-list" class="source-list"></div>
+          <h2>Reminder lists</h2>
+          <p class="muted">Always syncs title and completion. Optional: notes, due, priority, flag, location, URL, tags.</p>
+          <div id="lists-list" class="source-list"></div>
+        </section>
+
+        <section class="panel tab-panel" id="tab-ha">
+          <h1>Home Assistant</h1>
+          <p class="lede">Register each HA instance so the Mac can push webhook refreshes.</p>
+          <div id="ha-list" class="stack"></div>
+          <form id="ha-form" class="box">
+            <h2>Add / update instance</h2>
+            <input type="hidden" id="ha-id" value="" />
+            <label>Name <input id="ha-name" required placeholder="Home" /></label>
+            <label>Base URL <input id="ha-url" required placeholder="http://homeassistant.local:8123" /></label>
+            <label>Long-lived access token
+              <input id="ha-token" type="password" autocomplete="off" placeholder="HA token" />
+            </label>
+            <label>Webhook ID <input id="ha-webhook-id" placeholder="apple_hasync_…" /></label>
+            <label>Webhook secret <input id="ha-webhook-secret" type="password" autocomplete="off" /></label>
+            <label class="check"><input type="checkbox" id="ha-verify-tls" /> Verify TLS</label>
+            <p class="muted">For LAN HTTP HA, leave Verify TLS unchecked (and enable Allow insecure HTTP under Agent if needed).</p>
+            <p class="err" id="ha-err" hidden></p>
+            <div class="row">
+              <button type="submit" class="primary">Save</button>
+              <button type="button" class="ghost" id="btn-ha-test-form">Test connection</button>
+              <button type="button" class="ghost" id="btn-ha-reset">Clear form</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="panel tab-panel" id="tab-agent">
+          <h1>Agent</h1>
+          <form id="agent-form" class="box">
+            <label>Listen host <input id="listen-host" /></label>
+            <label>Listen port <input id="listen-port" type="number" min="1" max="65535" /></label>
+            <label class="check"><input type="checkbox" id="allow-insecure" /> Allow insecure HTTP (lab)</label>
+            <label>Allowed source IPs (comma-separated, empty = any)
+              <input id="allowed-ips" placeholder="homeassistant.local, 192.168.1.0/24" />
+            </label>
+            <p class="muted">Listen/TLS changes need a LaunchAgent restart (<code>update-mac-agent.sh</code> or kickstart).</p>
+            <p class="err" id="agent-err" hidden></p>
+            <button type="submit" class="primary">Save agent settings</button>
+          </form>
+          <div class="box">
+            <h2>Token</h2>
+            <div class="token-row">
+              <code id="agent-token">—</code>
+              <button type="button" class="ghost" id="btn-copy-agent-token">Copy</button>
+              <button type="button" class="danger" id="btn-rotate-token">Rotate</button>
+            </div>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <p class="toast" id="toast" hidden></p>
+  </div>
+  <script src="/ui/assets/app.js"></script>
+</body>
+</html>

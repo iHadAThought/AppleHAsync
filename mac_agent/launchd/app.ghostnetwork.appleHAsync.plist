@@ -1,15 +1,22 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
+<!--
+  Template only — prefer deploy/install-mac-agent.sh which writes a fully
+  resolved plist pointing at ~/Applications/appleHAsync.app.
+  Label / AssociatedBundleIdentifiers must stay app.ghostnetwork.appleHAsync
+  so Login Items & Extensions show "appleHAsync".
+-->
 <dict>
   <key>Label</key>
-  <string>app.ghostnetwork.applehasync</string>
+  <string>app.ghostnetwork.appleHAsync</string>
+  <key>AssociatedBundleIdentifiers</key>
+  <array>
+    <string>app.ghostnetwork.appleHAsync</string>
+  </array>
   <key>ProgramArguments</key>
   <array>
-    <string>/usr/bin/env</string>
-    <string>python3</string>
-    <string>-m</string>
-    <string>mac_agent.cli</string>
+    <string>/Users/Shared/Applications/appleHAsync.app/Contents/MacOS/appleHAsync</string>
     <string>serve</string>
   </array>
   <key>WorkingDirectory</key>
@@ -24,8 +31,12 @@
   <string>/Users/Shared/appleHAsync/logs/agent.err.log</string>
   <key>EnvironmentVariables</key>
   <dict>
+    <key>APPLE_HASYNC_ROOT</key>
+    <string>/Users/Shared/appleHAsync</string>
     <key>PYTHONPATH</key>
     <string>/Users/Shared/appleHAsync</string>
   </dict>
+  <key>ProcessType</key>
+  <string>Interactive</string>
 </dict>
 </plist>

@@ -9,30 +9,50 @@ Setup and operations live in BookStack: **[appleHAsync](https://bookstack.ghostn
 | Path | Role |
 |------|------|
 | `mac_agent/` | Always-on Mac Mini companion (EventKit + HTTPS API + CLI) |
+| `mac_agent/macos_app/` | `appleHAsync.app` builder (TCC / Login Items identity) |
 | `custom_components/apple_hasync/` | Home Assistant integration (`calendar` + `todo`) |
 | `shared/` | Shared domain models / backend protocol |
+| `deploy/install-mac-agent.sh` | One-click Mac installer |
 
-## Quick start (Mac Mini)
+## One-click Mac install
+
+On the Mac Mini (clone first if the Forgejo repo is private):
 
 ```bash
-cd /path/to/appleHAsync
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r mac_agent/requirements.txt
-export PYTHONPATH=$PWD
-python -m mac_agent.cli permissions request
-python -m mac_agent.cli share list
-python -m mac_agent.cli share enable calendar <CALENDAR_ID>
-python -m mac_agent.cli share enable reminder_list <LIST_ID>
-python -m mac_agent.cli token show
-python -m mac_agent.cli serve
+git clone https://git.ghostnetwork.app/Brendan/appleHAsync.git ~/appleHAsync
+~/appleHAsync/deploy/install-mac-agent.sh
 ```
 
-Register Home Assistant instances on the Mac:
+Or from an existing checkout:
 
 ```bash
-python -m mac_agent.cli ha add --name Home --url https://HOMEASSISTANT:8123 \
+./deploy/install-mac-agent.sh
+```
+
+This installs:
+
+- Code + venv → `~/appleHAsync`
+- App → `~/Applications/appleHAsync.app` (shows as **appleHAsync** in Calendars, Reminders, and Login Items & Extensions)
+- LaunchAgent → `app.ghostnetwork.appleHAsync` (runs at login / KeepAlive)
+
+Approve **Calendars** and **Reminders** Full Access for **appleHAsync** when prompted.
+
+```bash
+# After install — CLI is the app binary
+~/Applications/appleHAsync.app/Contents/MacOS/appleHAsync share list
+~/Applications/appleHAsync.app/Contents/MacOS/appleHAsync token show
+```
+
+## Manual / advanced Mac commands
+
+```bash
+export PATH="$HOME/Applications/appleHAsync.app/Contents/MacOS:$PATH"
+appleHAsync permissions status
+appleHAsync share enable calendar <CALENDAR_ID>
+appleHAsync share enable reminder_list <LIST_ID>
+appleHAsync ha add --name Home --url https://HOMEASSISTANT:8123 \
   --token LONG_LIVED_TOKEN --webhook-id apple_hasync_ENTRYID --webhook-secret SECRET
-python -m mac_agent.cli ha test Home
+appleHAsync ha test Home
 ```
 
 ## Quick start (Home Assistant)

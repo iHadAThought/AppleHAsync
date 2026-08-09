@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleDisplayName</key>
+	<string>appleHAsync</string>
+	<key>CFBundleExecutable</key>
+	<string>appleHAsync</string>
+	<key>CFBundleIdentifier</key>
+	<string>app.ghostnetwork.appleHAsync</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>appleHAsync</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>0.1.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>13.0</string>
+	<key>LSUIElement</key>
+	<true/>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+	<key>NSCalendarsUsageDescription</key>
+	<string>appleHAsync syncs shared calendars with Home Assistant.</string>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>appleHAsync needs full calendar access to sync shared calendars with Home Assistant.</string>
+	<key>NSRemindersUsageDescription</key>
+	<string>appleHAsync syncs shared reminder lists with Home Assistant.</string>
+	<key>NSRemindersFullAccessUsageDescription</key>
+	<string>appleHAsync needs full reminders access to sync shared lists with Home Assistant.</string>
+</dict>
+</plist>

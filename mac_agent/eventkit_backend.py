@@ -163,13 +163,21 @@ class EventKitBackend:
 
     def reset_tcc(self, which: str = "both") -> None:
         """Reset TCC entries so the system prompt can appear again."""
+        # Prefer resetting only appleHAsync.app; fall back to service-wide.
+        bundle_id = "app.ghostnetwork.appleHAsync"
         services = []
         if which in ("both", "calendar", "calendars"):
             services.append("Calendar")
         if which in ("both", "reminders"):
             services.append("Reminders")
         for svc in services:
-            subprocess.run(["tccutil", "reset", svc], check=False)
+            r = subprocess.run(
+                ["tccutil", "reset", svc, bundle_id],
+                check=False,
+                capture_output=True,
+            )
+            if r.returncode != 0:
+                subprocess.run(["tccutil", "reset", svc], check=False)
 
     def list_calendars(self, *, shared_only: bool = False) -> list[CalendarSource]:
         EK = self._EK

@@ -15,6 +15,46 @@ import yaml
 APP_NAME = "appleHAsync"
 DEFAULT_PORT = 8745
 
+# Per-source detail fields the user can toggle in the Web UI.
+CALENDAR_SYNC_FIELDS = ("notes", "location", "url")
+REMINDER_SYNC_FIELDS = (
+    "notes",
+    "due",
+    "priority",
+    "flagged",
+    "location",
+    "url",
+    "tags",
+)
+
+
+def default_calendar_sync_fields() -> dict[str, bool]:
+    return {k: True for k in CALENDAR_SYNC_FIELDS}
+
+
+def default_reminder_sync_fields() -> dict[str, bool]:
+    return {k: True for k in REMINDER_SYNC_FIELDS}
+
+
+def normalize_calendar_sync_fields(raw: Any) -> dict[str, bool]:
+    base = default_calendar_sync_fields()
+    if not isinstance(raw, dict):
+        return base
+    for key in CALENDAR_SYNC_FIELDS:
+        if key in raw:
+            base[key] = bool(raw[key])
+    return base
+
+
+def normalize_reminder_sync_fields(raw: Any) -> dict[str, bool]:
+    base = default_reminder_sync_fields()
+    if not isinstance(raw, dict):
+        return base
+    for key in REMINDER_SYNC_FIELDS:
+        if key in raw:
+            base[key] = bool(raw[key])
+    return base
+
 
 def default_data_dir() -> Path:
     override = os.environ.get("APPLE_HASYNC_DATA_DIR")
@@ -76,6 +116,9 @@ class AgentConfig:
     allowed_source_ips: list[str] = field(default_factory=list)
     shared_calendars: list[str] = field(default_factory=list)
     shared_reminder_lists: list[str] = field(default_factory=list)
+    # Per-source field allowlists (id -> {field: bool}); missing id = all enabled.
+    calendar_sync_fields: dict[str, dict[str, bool]] = field(default_factory=dict)
+    reminder_sync_fields: dict[str, dict[str, bool]] = field(default_factory=dict)
     home_assistants: list[HomeAssistantTarget] = field(default_factory=list)
     calendar_titles: dict[str, str] = field(default_factory=dict)
     reminder_titles: dict[str, str] = field(default_factory=dict)
@@ -88,6 +131,16 @@ class AgentConfig:
 
     def is_list_shared(self, list_id: str) -> bool:
         return list_id in self.shared_reminder_lists
+
+    def calendar_fields(self, calendar_id: str) -> dict[str, bool]:
+        return normalize_calendar_sync_fields(
+            self.calendar_sync_fields.get(calendar_id)
+        )
+
+    def reminder_fields(self, list_id: str) -> dict[str, bool]:
+        return normalize_reminder_sync_fields(
+            self.reminder_sync_fields.get(list_id)
+        )
 
     def prune_missing_shares(
         self, calendar_ids: set[str], list_ids: set[str]
@@ -103,6 +156,18 @@ class AgentConfig:
             self.shared_reminder_lists = [
                 i for i in self.shared_reminder_lists if i in list_ids
             ]
+        self.calendar_sync_fields = {
+            k: v for k, v in self.calendar_sync_fields.items() if k in calendar_ids
+        }
+        self.reminder_sync_fields = {
+            k: v for k, v in self.reminder_sync_fields.items() if k in list_ids
+        }
+        self.calendar_titles = {
+            k: v for k, v in self.calendar_titles.items() if k in calendar_ids
+        }
+        self.reminder_titles = {
+            k: v for k, v in self.reminder_titles.items() if k in list_ids
+        }
         return stale_c, stale_l
 
 
@@ -149,6 +214,19 @@ class ConfigStore:
             merged = {**item, **secret_entry}
             ha_list.append(HomeAssistantTarget.from_dict(merged))
 
+        cal_fields_raw = raw.get("calendar_sync_fields") or {}
+        rem_fields_raw = raw.get("reminder_sync_fields") or {}
+        calendar_sync_fields = {
+            str(k): normalize_calendar_sync_fields(v)
+            for k, v in cal_fields_raw.items()
+            if isinstance(v, dict)
+        }
+        reminder_sync_fields = {
+            str(k): normalize_reminder_sync_fields(v)
+            for k, v in rem_fields_raw.items()
+            if isinstance(v, dict)
+        }
+
         self._config = AgentConfig(
             listen_host=raw.get("listen_host", "127.0.0.1"),
             listen_port=int(raw.get("listen_port", DEFAULT_PORT)),
@@ -158,6 +236,8 @@ class ConfigStore:
             allowed_source_ips=list(raw.get("allowed_source_ips") or []),
             shared_calendars=list(raw.get("shared_calendars") or []),
             shared_reminder_lists=list(raw.get("shared_reminder_lists") or []),
+            calendar_sync_fields=calendar_sync_fields,
+            reminder_sync_fields=reminder_sync_fields,
             home_assistants=ha_list,
             calendar_titles=dict(raw.get("calendar_titles") or {}),
             reminder_titles=dict(raw.get("reminder_titles") or {}),
@@ -181,6 +261,8 @@ class ConfigStore:
             "allowed_source_ips": self._config.allowed_source_ips,
             "shared_calendars": self._config.shared_calendars,
             "shared_reminder_lists": self._config.shared_reminder_lists,
+            "calendar_sync_fields": self._config.calendar_sync_fields,
+            "reminder_sync_fields": self._config.reminder_sync_fields,
             "calendar_titles": self._config.calendar_titles,
             "reminder_titles": self._config.reminder_titles,
             "echo_suppress_seconds": self._config.echo_suppress_seconds,
@@ -230,6 +312,8 @@ class ConfigStore:
         list_ids: list[str] | None = None,
         calendar_titles: dict[str, str] | None = None,
         reminder_titles: dict[str, str] | None = None,
+        calendar_sync_fields: dict[str, dict[str, bool]] | None = None,
+        reminder_sync_fields: dict[str, dict[str, bool]] | None = None,
     ) -> None:
         if calendar_ids is not None:
             self._config.shared_calendars = list(dict.fromkeys(calendar_ids))
@@ -239,6 +323,23 @@ class ConfigStore:
             self._config.calendar_titles.update(calendar_titles)
         if reminder_titles:
             self._config.reminder_titles.update(reminder_titles)
+        if calendar_sync_fields is not None:
+            merged = dict(self._config.calendar_sync_fields)
+            for sid, fields in calendar_sync_fields.items():
+                merged[str(sid)] = normalize_calendar_sync_fields(fields)
+            # Drop configs for calendars that are no longer shared
+            if calendar_ids is not None:
+                shared = set(calendar_ids)
+                merged = {k: v for k, v in merged.items() if k in shared}
+            self._config.calendar_sync_fields = merged
+        if reminder_sync_fields is not None:
+            merged = dict(self._config.reminder_sync_fields)
+            for sid, fields in reminder_sync_fields.items():
+                merged[str(sid)] = normalize_reminder_sync_fields(fields)
+            if list_ids is not None:
+                shared = set(list_ids)
+                merged = {k: v for k, v in merged.items() if k in shared}
+            self._config.reminder_sync_fields = merged
         self.save()
 
     def enable_calendar(self, calendar_id: str, title: str | None = None) -> None:

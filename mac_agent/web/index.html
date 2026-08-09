@@ -65,16 +65,18 @@
 
         <section class="panel tab-panel" id="tab-shares">
           <h1>Shared sources</h1>
-          <p class="lede">Only checked items are visible to Home Assistant (fail-closed).</p>
+          <p class="lede">Enable a calendar or reminder list, then choose which details sync to Home Assistant for that source.</p>
           <div class="row">
             <button type="button" class="ghost" id="btn-refresh-shares">Refresh</button>
             <button type="button" class="primary" id="btn-save-shares">Save shares</button>
           </div>
           <p class="err" id="shares-err" hidden></p>
           <h2>Calendars</h2>
-          <div id="calendars-list" class="checklist-grid"></div>
+          <p class="muted">Always syncs title, start, and end. Optional: notes, location, URL.</p>
+          <div id="calendars-list" class="source-list"></div>
           <h2>Reminder lists</h2>
-          <div id="lists-list" class="checklist-grid"></div>
+          <p class="muted">Always syncs title and completion. Optional: notes, due, priority, flag, location, URL, tags.</p>
+          <div id="lists-list" class="source-list"></div>
         </section>
 
         <section class="panel tab-panel" id="tab-ha">

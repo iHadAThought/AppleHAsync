@@ -16,7 +16,12 @@ from pydantic import BaseModel, Field
 
 from shared.models import Event, EventPatch, TodoItem, TodoItemPatch, TodoItemStatus
 
-from .config import ConfigStore, HomeAssistantTarget
+from .config import (
+    CALENDAR_SYNC_FIELDS,
+    REMINDER_SYNC_FIELDS,
+    ConfigStore,
+    HomeAssistantTarget,
+)
 from .ha_notify import HaNotifier
 from .security import client_ip_allowed, generate_self_signed_cert, test_ha_connection
 from .sync_meta import SyncMetaStore
@@ -31,6 +36,36 @@ notifier: HaNotifier | None = None
 watcher: ChangeWatcher | None = None
 _auth_failures: dict[str, list[float]] = defaultdict(list)
 _mutate_hits: dict[str, list[float]] = defaultdict(list)
+
+
+def _event_to_public_dict(event: Event, fields: dict[str, bool]) -> dict[str, Any]:
+    data = event.to_dict()
+    if not fields.get("notes", True):
+        data["description"] = None
+    if not fields.get("location", True):
+        data["location"] = None
+    if not fields.get("url", True):
+        data["url"] = None
+    return data
+
+
+def _todo_to_public_dict(item: TodoItem, fields: dict[str, bool]) -> dict[str, Any]:
+    data = item.to_dict()
+    if not fields.get("notes", True):
+        data["description"] = None
+    if not fields.get("due", True):
+        data["due"] = None
+    if not fields.get("priority", True):
+        data["priority"] = None
+    if not fields.get("flagged", True):
+        data["flagged"] = None
+    if not fields.get("location", True):
+        data["location"] = None
+    if not fields.get("url", True):
+        data["url"] = None
+    if not fields.get("tags", True):
+        data["tags"] = None
+    return data
 
 
 def _rate_limit_auth(client_ip: str | None) -> None:
@@ -70,6 +105,8 @@ class ShareUpdate(BaseModel):
     shared_reminder_lists: list[str] | None = None
     calendar_titles: dict[str, str] | None = None
     reminder_titles: dict[str, str] | None = None
+    calendar_sync_fields: dict[str, dict[str, bool]] | None = None
+    reminder_sync_fields: dict[str, dict[str, bool]] | None = None
 
 
 class ShareToggle(BaseModel):
@@ -120,6 +157,7 @@ class EventCreateBody(BaseModel):
     end: str
     description: str | None = None
     location: str | None = None
+    url: str | None = None
     all_day: bool = False
 
 
@@ -129,6 +167,10 @@ class TodoCreateBody(BaseModel):
     status: str = "needs_action"
     due: str | None = None
     priority: int | None = None
+    location: str | None = None
+    url: str | None = None
+    flagged: bool | None = None
+    tags: list[str] | None = None
 
 
 def _parse_dt(value: str):
@@ -302,8 +344,12 @@ async def get_events(calendar_id: str, start: str, end: str):
     cfg = get_store().config
     if not cfg.is_calendar_shared(calendar_id):
         raise HTTPException(status_code=404, detail="not_shared")
+    fields = cfg.calendar_fields(calendar_id)
     events = backend.get_events(calendar_id, _parse_dt(start), _parse_dt(end))
-    return {"events": [e.to_dict() for e in events]}
+    return {
+        "events": [_event_to_public_dict(e, fields) for e in events],
+        "sync_fields": fields,
+    }
 
 
 @app.get("/v1/lists/{list_id}/items", dependencies=[Depends(require_auth)])
@@ -312,8 +358,12 @@ async def get_items(list_id: str):
     cfg = get_store().config
     if not cfg.is_list_shared(list_id):
         raise HTTPException(status_code=404, detail="not_shared")
+    fields = cfg.reminder_fields(list_id)
     items = backend.get_todo_items(list_id)
-    return {"items": [i.to_dict() for i in items]}
+    return {
+        "items": [_todo_to_public_dict(i, fields) for i in items],
+        "sync_fields": fields,
+    }
 
 
 @app.post("/v1/calendars/{calendar_id}/events", dependencies=[Depends(require_auth)])
@@ -331,6 +381,7 @@ async def create_event(calendar_id: str, body: EventCreateBody, request: Request
         end=_parse_dt(body.end),
         description=body.description,
         location=body.location,
+        url=body.url,
         all_day=body.all_day,
     )
     created = backend.create_event(calendar_id, event)
@@ -399,6 +450,10 @@ async def create_item(list_id: str, body: TodoCreateBody, request: Request):
         status=TodoItemStatus(body.status),
         due=_parse_dt(body.due) if body.due else None,
         priority=body.priority,
+        location=body.location,
+        url=body.url,
+        flagged=body.flagged,
+        tags=body.tags,
     )
     created = backend.create_todo_item(list_id, item)
     if meta and created.content_hash:
@@ -459,12 +514,21 @@ async def admin_sources():
     calendars = []
     for cal in backend.list_calendars():
         cal.shared = cfg.is_calendar_shared(cal.id)
-        calendars.append(cal.to_dict())
+        row = cal.to_dict()
+        row["sync_fields"] = cfg.calendar_fields(cal.id)
+        calendars.append(row)
     lists = []
     for lst in backend.list_reminder_lists():
         lst.shared = cfg.is_list_shared(lst.id)
-        lists.append(lst.to_dict())
-    return {"calendars": calendars, "reminder_lists": lists}
+        row = lst.to_dict()
+        row["sync_fields"] = cfg.reminder_fields(lst.id)
+        lists.append(row)
+    return {
+        "calendars": calendars,
+        "reminder_lists": lists,
+        "calendar_field_keys": list(CALENDAR_SYNC_FIELDS),
+        "reminder_field_keys": list(REMINDER_SYNC_FIELDS),
+    }
 
 
 @app.put("/v1/admin/share", dependencies=[Depends(require_auth)])
@@ -475,12 +539,16 @@ async def admin_share(body: ShareUpdate):
         list_ids=body.shared_reminder_lists,
         calendar_titles=body.calendar_titles,
         reminder_titles=body.reminder_titles,
+        calendar_sync_fields=body.calendar_sync_fields,
+        reminder_sync_fields=body.reminder_sync_fields,
     )
     if notifier:
         await notifier.notify_refresh("share_changed")
     return {
         "shared_calendars": st.config.shared_calendars,
         "shared_reminder_lists": st.config.shared_reminder_lists,
+        "calendar_sync_fields": st.config.calendar_sync_fields,
+        "reminder_sync_fields": st.config.reminder_sync_fields,
     }
 
 

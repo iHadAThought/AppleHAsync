@@ -140,10 +140,12 @@ class AppleHASyncCalendar(CoordinatorEntity[AppleHASyncCoordinator], CalendarEnt
         return [_to_calendar_event(item) for item in raw]
 
     async def async_create_event(self, **kwargs: Any) -> None:
+        notes, url = _split_notes_and_url(kwargs.get("description"))
         body = {
             "summary": kwargs.get("summary"),
-            "description": kwargs.get("description"),
+            "description": notes,
             "location": kwargs.get("location"),
+            "url": url,
             "start": _fmt(kwargs["start"]),
             "end": _fmt(kwargs["end"]),
             "all_day": isinstance(kwargs.get("start"), date)
@@ -173,9 +175,13 @@ class AppleHASyncCalendar(CoordinatorEntity[AppleHASyncCoordinator], CalendarEnt
     ) -> None:
         # Field-level patch only — send keys HA provided
         patch: dict[str, Any] = {}
-        for key in ("summary", "description", "location"):
+        for key in ("summary", "location"):
             if key in event:
                 patch[key] = event[key]
+        if "description" in event:
+            notes, url = _split_notes_and_url(event.get("description"))
+            patch["description"] = notes
+            patch["url"] = url
         if "dtstart" in event:
             patch["start"] = _fmt(event["dtstart"])
         if "start" in event:
@@ -212,9 +218,44 @@ def _to_calendar_event(item: dict[str, Any]) -> CalendarEvent:
         summary=item.get("summary") or "",
         start=start,
         end=end,
-        description=item.get("description"),
-        location=item.get("location"),
+        description=_compose_description(item.get("description"), item.get("url")),
+        location=item.get("location") or None,
     )
+
+
+def _compose_description(notes: Any, url: Any) -> str | None:
+    """HA CalendarEvent has no URL field — fold EventKit URL into description."""
+    text = notes.strip() if isinstance(notes, str) and notes.strip() else None
+    link = url.strip() if isinstance(url, str) and url.strip() else None
+    if text and link:
+        if link in text:
+            return text
+        return f"{text}\n\n{link}"
+    return text or link
+
+
+_URL_ONLY_LINE = re.compile(r"^https?://\S+$", re.IGNORECASE)
+
+
+def _split_notes_and_url(description: Any) -> tuple[str | None, str | None]:
+    """Best-effort split of HA description back into notes + URL for EventKit."""
+    if not isinstance(description, str):
+        return None, None
+    text = description.strip()
+    if not text:
+        return None, None
+    lines = [ln.rstrip() for ln in text.splitlines()]
+    # Drop trailing blank lines
+    while lines and not lines[-1].strip():
+        lines.pop()
+    if lines and _URL_ONLY_LINE.fullmatch(lines[-1].strip()):
+        link = lines[-1].strip()
+        while len(lines) > 1 and not lines[-2].strip():
+            lines.pop(-2)
+        lines.pop()
+        notes = "\n".join(lines).strip() or None
+        return notes, link
+    return text, None
 
 
 def _parse(value: str) -> date | datetime:

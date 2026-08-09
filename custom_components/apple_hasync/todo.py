@@ -19,6 +19,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
 from .coordinator import AppleHASyncCoordinator
+from .todo_display import compose_todo_description, parse_todo_description
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -99,9 +100,6 @@ class AppleHASyncTodoList(CoordinatorEntity[AppleHASyncCoordinator], TodoListEnt
         items: list[TodoItem] = []
         for item in raw:
             uid = item.get("uid")
-            if uid and self.coordinator.is_echo("todo", uid):
-                # Still show Mac master data; echo flag only avoids thrash loops externally
-                pass
             status = (
                 TodoItemStatus.COMPLETED
                 if item.get("status") == "completed"
@@ -115,21 +113,39 @@ class AppleHASyncTodoList(CoordinatorEntity[AppleHASyncCoordinator], TodoListEnt
                     if len(due_s) == 10
                     else datetime.fromisoformat(due_s.replace("Z", "+00:00"))
                 )
+            completed = None
+            if item.get("completed_at"):
+                try:
+                    completed = datetime.fromisoformat(
+                        str(item["completed_at"]).replace("Z", "+00:00")
+                    )
+                except Exception:
+                    completed = None
+            description = compose_todo_description(
+                notes=item.get("description"),
+                priority=item.get("priority"),
+                flagged=item.get("flagged"),
+                location=item.get("location"),
+                url=item.get("url"),
+                tags=item.get("tags"),
+            )
             items.append(
                 TodoItem(
                     uid=uid,
                     summary=item.get("summary") or "",
                     status=status,
-                    description=item.get("description"),
+                    description=description,
                     due=due,
+                    completed=completed,
                 )
             )
         return items
 
     async def async_create_todo_item(self, item: TodoItem) -> None:
+        parsed = parse_todo_description(item.description)
         body: dict[str, Any] = {
             "summary": item.summary,
-            "description": item.description,
+            "description": parsed.get("notes"),
             "status": (
                 "completed"
                 if item.status == TodoItemStatus.COMPLETED
@@ -138,6 +154,9 @@ class AppleHASyncTodoList(CoordinatorEntity[AppleHASyncCoordinator], TodoListEnt
         }
         if item.due is not None:
             body["due"] = item.due.isoformat()
+        for key in ("priority", "location", "url", "flagged", "tags"):
+            if parsed.get(key) is not None:
+                body[key] = parsed[key]
         created = await self.coordinator.client.create_item(self._list_id, body)
         if uid := created.get("uid"):
             self.coordinator.mark_echo("todo", uid)
@@ -145,17 +164,22 @@ class AppleHASyncTodoList(CoordinatorEntity[AppleHASyncCoordinator], TodoListEnt
 
     async def async_update_todo_item(self, item: TodoItem) -> None:
         uid = cast(str, item.uid)
+        parsed = parse_todo_description(item.description)
         new_data: dict[str, Any] = {
             "summary": item.summary,
-            "description": item.description,
+            "description": parsed.get("notes"),
             "status": (
                 "completed"
                 if item.status == TodoItemStatus.COMPLETED
                 else "needs_action"
             ),
             "due": item.due.isoformat() if item.due else None,
+            "priority": parsed.get("priority"),
+            "location": parsed.get("location"),
+            "url": parsed.get("url"),
+            "flagged": parsed.get("flagged"),
+            "tags": parsed.get("tags"),
         }
-        # Only send changed fields vs Mac snapshot
         patch = self.coordinator.diff_todo_patch(self._list_id, uid, new_data)
         if not patch:
             return

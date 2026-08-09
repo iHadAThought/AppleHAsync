@@ -167,9 +167,10 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .checklist li.done { color: var(--ok); }
 .checklist li.bad { color: var(--bad); }
 
-.checklist-grid {
+.checklist-grid,
+.source-list {
   display: grid;
-  gap: 0.4rem;
+  gap: 0.65rem;
 }
 .checklist-grid label {
   margin: 0;
@@ -187,6 +188,56 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   color: var(--muted);
   font-size: 0.8rem;
 }
+
+.source-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #121820;
+  padding: 0.7rem 0.8rem 0.85rem;
+}
+.source-enable {
+  margin: 0;
+  display: flex;
+  gap: 0.55rem;
+  align-items: center;
+  color: var(--ink);
+  font-size: 0.95rem;
+}
+.source-enable input { width: auto; margin: 0; }
+.source-title { font-weight: 600; }
+.source-enable .meta {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.field-caption {
+  margin: 0.55rem 0 0.35rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.field-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.field-row.disabled {
+  opacity: 0.45;
+}
+.field-chip {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.28rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: #0f151c;
+  color: var(--ink);
+  font-size: 0.82rem;
+}
+.field-chip input { width: auto; margin: 0; }
 
 .ha-card {
   border: 1px solid var(--line);

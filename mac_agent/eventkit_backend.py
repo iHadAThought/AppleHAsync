@@ -101,6 +101,213 @@ def _calendar_color_hex(cal: Any) -> str | None:
         return None
 
 
+def _eventkit_url_string(ev: Any) -> str | None:
+    try:
+        url = ev.URL()
+    except Exception:
+        return None
+    if url is None:
+        return None
+    try:
+        if hasattr(url, "absoluteString"):
+            value = str(url.absoluteString() or "").strip()
+        else:
+            value = str(url).strip()
+    except Exception:
+        return None
+    return value or None
+
+
+def _eventkit_location_string(ev: Any) -> str | None:
+    """Prefer plain location; fall back to structured location title (addresses)."""
+    try:
+        loc = str(ev.location() or "").strip()
+        if loc:
+            return loc
+    except Exception:
+        pass
+    try:
+        structured = ev.structuredLocation()
+        if structured is None:
+            return None
+        title = str(structured.title() or "").strip()
+        return title or None
+    except Exception:
+        return None
+
+
+def _set_eventkit_url(ev: Any, url: str | None) -> None:
+    from Foundation import NSURL
+
+    if not url:
+        ev.setURL_(None)
+        return
+    nsurl = NSURL.URLWithString_(url)
+    ev.setURL_(nsurl)
+
+
+def _date_component_is_set(value: Any) -> bool:
+    if value is None:
+        return False
+    try:
+        from Foundation import NSDateComponentUndefined
+
+        if value == NSDateComponentUndefined:
+            return False
+    except Exception:
+        pass
+    try:
+        iv = int(value)
+        if iv < 0 or iv > 10_000:
+            return False
+    except Exception:
+        return False
+    return True
+
+
+def _reminder_due_from_components(comps: Any) -> date | datetime | None:
+    if comps is None:
+        return None
+    try:
+        y, m, d = comps.year(), comps.month(), comps.day()
+        if not (
+            _date_component_is_set(y)
+            and _date_component_is_set(m)
+            and _date_component_is_set(d)
+        ):
+            return None
+        hour = comps.hour()
+        minute = comps.minute()
+        second = comps.second() if hasattr(comps, "second") else 0
+        if _date_component_is_set(hour):
+            local_tz = datetime.now().astimezone().tzinfo
+            return datetime(
+                int(y),
+                int(m),
+                int(d),
+                int(hour),
+                int(minute) if _date_component_is_set(minute) else 0,
+                int(second) if _date_component_is_set(second) else 0,
+                tzinfo=local_tz,
+            )
+        return date(int(y), int(m), int(d))
+    except Exception:
+        _LOGGER.debug("dueDateComponents parse failed", exc_info=True)
+        return None
+
+
+def _reminder_flagged(rem: Any) -> bool | None:
+    """Best-effort; EventKit has no official flagged API."""
+    for key in ("flagged", "isFlagged", "hasFlagged"):
+        try:
+            value = rem.valueForKey_(key)
+            if value is None:
+                continue
+            return bool(value)
+        except Exception:
+            continue
+    return None
+
+
+def _set_reminder_flagged(rem: Any, flagged: bool | None) -> None:
+    if flagged is None:
+        return
+    for key in ("flagged", "isFlagged"):
+        try:
+            rem.setValue_forKey_(bool(flagged), key)
+            return
+        except Exception:
+            continue
+
+
+def _reminder_tags(rem: Any) -> list[str] | None:
+    """Best-effort; tags are not part of the public EventKit reminder API."""
+    for key in ("tags", "tagNames"):
+        try:
+            value = rem.valueForKey_(key)
+        except Exception:
+            continue
+        if value is None:
+            continue
+        tags: list[str] = []
+        try:
+            for item in list(value):
+                if item is None:
+                    continue
+                if hasattr(item, "name"):
+                    name = str(item.name() or "").strip()
+                else:
+                    name = str(item).strip()
+                if name:
+                    tags.append(name)
+        except Exception:
+            text = str(value).strip()
+            if text:
+                tags = [text]
+        return tags or None
+    return None
+
+
+def _todo_from_reminder(rem: Any, list_id: str) -> TodoItem:
+    uid = str(
+        rem.calendarItemIdentifier()
+        or rem.calendarItemExternalIdentifier()
+        or ""
+    )
+    summary = str(rem.title() or "")
+    description = str(rem.notes()) if rem.notes() else None
+    completed = bool(rem.isCompleted())
+    status = TodoItemStatus.COMPLETED if completed else TodoItemStatus.NEEDS_ACTION
+    due = None
+    try:
+        due = _reminder_due_from_components(rem.dueDateComponents())
+    except Exception:
+        due = None
+    priority = int(rem.priority()) if rem.priority() else None
+    if priority == 0:
+        priority = None
+    location = _eventkit_location_string(rem)
+    url = _eventkit_url_string(rem)
+    flagged = _reminder_flagged(rem)
+    tags = _reminder_tags(rem)
+    completed_at = None
+    try:
+        if rem.completionDate():
+            completed_at = _nsdate_to_dt(rem.completionDate())
+    except Exception:
+        completed_at = None
+    lm = _nsdate_to_dt(rem.lastModifiedDate()) if rem.lastModifiedDate() else None
+    ch = content_hash_for(
+        uid,
+        summary,
+        description,
+        status.value,
+        due,
+        priority,
+        location,
+        url,
+        flagged,
+        tags,
+        completed_at,
+    )
+    return TodoItem(
+        uid=uid,
+        list_id=list_id,
+        summary=summary,
+        status=status,
+        description=description,
+        due=due,
+        priority=priority,
+        location=location,
+        url=url,
+        flagged=flagged,
+        tags=tags,
+        completed_at=completed_at,
+        content_hash=ch,
+        last_modified=lm,
+    )
+
+
 def _dt_to_nsdate(value: datetime | date, EventKit: Any) -> Any:
     from Foundation import NSDate
 
@@ -296,7 +503,8 @@ class EventKitBackend:
             uid = str(ev.eventIdentifier() or ev.calendarItemExternalIdentifier() or "")
             summary = str(ev.title() or "")
             description = str(ev.notes()) if ev.notes() else None
-            location = str(ev.location()) if ev.location() else None
+            location = _eventkit_location_string(ev)
+            url = _eventkit_url_string(ev)
             all_day = bool(ev.isAllDay())
             start_dt = _nsdate_to_dt(ev.startDate())
             end_dt = _nsdate_to_dt(ev.endDate())
@@ -306,7 +514,14 @@ class EventKitBackend:
             end_val: datetime | date = end_dt.date() if all_day else end_dt
             lm = _nsdate_to_dt(ev.lastModifiedDate()) if ev.lastModifiedDate() else None
             ch = content_hash_for(
-                uid, summary, description, location, start_val, end_val, all_day
+                uid,
+                summary,
+                description,
+                location,
+                url,
+                start_val,
+                end_val,
+                all_day,
             )
             result.append(
                 Event(
@@ -317,6 +532,7 @@ class EventKitBackend:
                     end=end_val,
                     description=description,
                     location=location,
+                    url=url,
                     all_day=all_day,
                     content_hash=ch,
                     last_modified=lm,
@@ -351,57 +567,7 @@ class EventKitBackend:
 
         result: list[TodoItem] = []
         for rem in box["items"]:
-            uid = str(
-                rem.calendarItemIdentifier()
-                or rem.calendarItemExternalIdentifier()
-                or ""
-            )
-            summary = str(rem.title() or "")
-            description = str(rem.notes()) if rem.notes() else None
-            completed = bool(rem.isCompleted())
-            status = (
-                TodoItemStatus.COMPLETED if completed else TodoItemStatus.NEEDS_ACTION
-            )
-            due = None
-            if rem.dueDateComponents() is not None:
-                comps = rem.dueDateComponents()
-                try:
-                    y = comps.year()
-                    m = comps.month()
-                    d = comps.day()
-                    if y and m and d:
-                        if comps.hour() is not None and comps.hour() >= 0:
-                            due = datetime(
-                                int(y),
-                                int(m),
-                                int(d),
-                                int(comps.hour() or 0),
-                                int(comps.minute() or 0),
-                            )
-                        else:
-                            due = date(int(y), int(m), int(d))
-                except Exception:
-                    due = None
-            priority = int(rem.priority()) if rem.priority() else None
-            lm = (
-                _nsdate_to_dt(rem.lastModifiedDate())
-                if rem.lastModifiedDate()
-                else None
-            )
-            ch = content_hash_for(uid, summary, description, status.value, due, priority)
-            result.append(
-                TodoItem(
-                    uid=uid,
-                    list_id=list_id,
-                    summary=summary,
-                    status=status,
-                    description=description,
-                    due=due,
-                    priority=priority or None,
-                    content_hash=ch,
-                    last_modified=lm,
-                )
-            )
+            result.append(_todo_from_reminder(rem, list_id))
         return result
 
     def create_event(self, calendar_id: str, event: Event) -> Event:
@@ -416,6 +582,8 @@ class EventKitBackend:
             ev.setNotes_(event.description)
         if event.location is not None:
             ev.setLocation_(event.location)
+        if event.url is not None:
+            _set_eventkit_url(ev, event.url)
         ev.setAllDay_(bool(event.all_day))
         ev.setStartDate_(_dt_to_nsdate(event.start, EK))
         ev.setEndDate_(_dt_to_nsdate(event.end, EK))
@@ -433,11 +601,13 @@ class EventKitBackend:
             raise KeyError(uid)
         if "summary" in patch._fields_set:
             ev.setTitle_(patch.summary)
-# Allow clearing a field by setting it to null/empty in the patch body.
+        # Allow clearing a field by setting it to null/empty in the patch body.
         if "description" in patch._fields_set:
             ev.setNotes_(patch.description if patch.description is not None else "")
         if "location" in patch._fields_set:
             ev.setLocation_(patch.location if patch.location is not None else "")
+        if "url" in patch._fields_set:
+            _set_eventkit_url(ev, patch.url)
         if "all_day" in patch._fields_set and patch.all_day is not None:
             ev.setAllDay_(bool(patch.all_day))
         if "start" in patch._fields_set and patch.start is not None:
@@ -481,6 +651,12 @@ class EventKitBackend:
             rem.setPriority_(int(item.priority))
         if item.due is not None:
             self._set_reminder_due(rem, item.due)
+        if item.location is not None:
+            rem.setLocation_(item.location)
+        if item.url is not None:
+            _set_eventkit_url(rem, item.url)
+        if item.flagged is not None:
+            _set_reminder_flagged(rem, item.flagged)
         ok, err = self._store.saveReminder_commit_error_(rem, True, None)
         if not ok:
             raise RuntimeError(f"Failed to save reminder: {err}")
@@ -495,7 +671,7 @@ class EventKitBackend:
         if "summary" in patch._fields_set:
             rem.setTitle_(patch.summary)
         if "description" in patch._fields_set:
-            rem.setNotes_(patch.description)
+            rem.setNotes_(patch.description if patch.description is not None else "")
         if "status" in patch._fields_set and patch.status is not None:
             rem.setCompleted_(patch.status == TodoItemStatus.COMPLETED)
         if "priority" in patch._fields_set:
@@ -505,6 +681,12 @@ class EventKitBackend:
                 rem.setDueDateComponents_(None)
             else:
                 self._set_reminder_due(rem, patch.due)
+        if "location" in patch._fields_set:
+            rem.setLocation_(patch.location if patch.location is not None else "")
+        if "url" in patch._fields_set:
+            _set_eventkit_url(rem, patch.url)
+        if "flagged" in patch._fields_set:
+            _set_reminder_flagged(rem, bool(patch.flagged) if patch.flagged is not None else False)
         ok, err = self._store.saveReminder_commit_error_(rem, True, None)
         if not ok:
             raise RuntimeError(f"Failed to patch reminder: {err}")
@@ -567,7 +749,8 @@ class EventKitBackend:
         uid = str(ev.eventIdentifier() or "")
         summary = str(ev.title() or "")
         description = str(ev.notes()) if ev.notes() else None
-        location = str(ev.location()) if ev.location() else None
+        location = _eventkit_location_string(ev)
+        url = _eventkit_url_string(ev)
         all_day = bool(ev.isAllDay())
         start_dt = _nsdate_to_dt(ev.startDate()) or datetime.now().astimezone()
         end_dt = _nsdate_to_dt(ev.endDate()) or (start_dt + timedelta(hours=1))
@@ -581,26 +764,19 @@ class EventKitBackend:
             end=end_val,
             description=description,
             location=location,
+            url=url,
             all_day=all_day,
             content_hash=content_hash_for(
-                uid, summary, description, location, start_val, end_val, all_day
+                uid,
+                summary,
+                description,
+                location,
+                url,
+                start_val,
+                end_val,
+                all_day,
             ),
         )
 
     def _todo_from_ek(self, rem: Any, list_id: str) -> TodoItem:
-        uid = str(rem.calendarItemIdentifier() or "")
-        summary = str(rem.title() or "")
-        description = str(rem.notes()) if rem.notes() else None
-        status = (
-            TodoItemStatus.COMPLETED
-            if rem.isCompleted()
-            else TodoItemStatus.NEEDS_ACTION
-        )
-        return TodoItem(
-            uid=uid,
-            list_id=list_id,
-            summary=summary,
-            status=status,
-            description=description,
-            content_hash=content_hash_for(uid, summary, description, status.value),
-        )
+        return _todo_from_reminder(rem, list_id)

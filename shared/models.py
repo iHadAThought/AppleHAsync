@@ -73,6 +73,7 @@ class Event:
     end: datetime | date
     description: str | None = None
     location: str | None = None
+    url: str | None = None
     all_day: bool = False
     recurrence_id: str | None = None
     rrule: str | None = None
@@ -96,9 +97,14 @@ class TodoItem:
     list_id: str
     summary: str
     status: TodoItemStatus = TodoItemStatus.NEEDS_ACTION
-    description: str | None = None
+    description: str | None = None  # EventKit notes (not HA-composed)
     due: datetime | date | None = None
     priority: int | None = None  # 1 high, 5 medium, 9 low (Apple-ish)
+    location: str | None = None
+    url: str | None = None
+    flagged: bool | None = None
+    tags: list[str] | None = None
+    completed_at: datetime | None = None
     content_hash: str | None = None
     last_modified: datetime | None = None
 
@@ -109,6 +115,8 @@ class TodoItem:
             data["due"] = data["due"].isoformat()
         if isinstance(data.get("last_modified"), datetime):
             data["last_modified"] = data["last_modified"].isoformat()
+        if isinstance(data.get("completed_at"), datetime):
+            data["completed_at"] = data["completed_at"].isoformat()
         return data
 
 
@@ -119,6 +127,7 @@ class EventPatch:
     summary: str | None = field(default=None)
     description: str | None = field(default=None)
     location: str | None = field(default=None)
+    url: str | None = field(default=None)
     start: datetime | date | None = field(default=None)
     end: datetime | date | None = field(default=None)
     all_day: bool | None = field(default=None)
@@ -126,7 +135,15 @@ class EventPatch:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> EventPatch:
-        known = {"summary", "description", "location", "start", "end", "all_day"}
+        known = {
+            "summary",
+            "description",
+            "location",
+            "url",
+            "start",
+            "end",
+            "all_day",
+        }
         present = {k for k in data if k in known}
         patch = cls(**{k: data[k] for k in present})
         patch._fields_set = present
@@ -152,11 +169,25 @@ class TodoItemPatch:
     status: TodoItemStatus | None = field(default=None)
     due: datetime | date | None = field(default=None)
     priority: int | None = field(default=None)
+    location: str | None = field(default=None)
+    url: str | None = field(default=None)
+    flagged: bool | None = field(default=None)
+    tags: list[str] | None = field(default=None)
     _fields_set: set[str] = field(default_factory=set, repr=False)
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> TodoItemPatch:
-        known = {"summary", "description", "status", "due", "priority"}
+        known = {
+            "summary",
+            "description",
+            "status",
+            "due",
+            "priority",
+            "location",
+            "url",
+            "flagged",
+            "tags",
+        }
         present = {k for k in data if k in known}
         kwargs: dict[str, Any] = {}
         for k in present:

@@ -104,6 +104,64 @@
     return ok;
   }
 
+  const CAL_FIELD_LABELS = {
+    notes: "Notes",
+    location: "Location / address",
+    url: "URL / link",
+  };
+  const REM_FIELD_LABELS = {
+    notes: "Notes",
+    due: "Due date / time",
+    priority: "Priority / urgent",
+    flagged: "Flag",
+    location: "Location",
+    url: "URL / link",
+    tags: "Tags",
+  };
+
+  function fieldChecksHtml(kind, id, syncFields, labels) {
+    const keys = Object.keys(labels);
+    const bits = keys
+      .map((key) => {
+        const checked = syncFields && syncFields[key] !== false ? "checked" : "";
+        return `<label class="field-chip"><input type="checkbox" data-field-kind="${kind}" data-source-id="${escapeAttr(
+          id
+        )}" data-field="${key}" ${checked}/><span>${escapeHtml(labels[key])}</span></label>`;
+      })
+      .join("");
+    return `<div class="field-row" data-fields-for="${escapeAttr(id)}">${bits}</div>`;
+  }
+
+  function renderSourceRow(kind, item, labels) {
+    const wrap = document.createElement("div");
+    wrap.className = "source-card";
+    wrap.dataset.id = item.id;
+    wrap.dataset.kind = kind;
+    const sync = item.sync_fields || {};
+    wrap.innerHTML = `
+      <label class="source-enable">
+        <input type="checkbox" data-kind="${kind}" data-id="${escapeAttr(item.id)}" data-title="${escapeAttr(
+      item.title || item.id
+    )}" ${item.shared ? "checked" : ""}/>
+        <span class="source-title">${escapeHtml(item.title || item.id)}</span>
+        <span class="meta">${escapeHtml(item.source_name || "")}</span>
+      </label>
+      <p class="field-caption">Details to sync</p>
+      ${fieldChecksHtml(kind, item.id, sync, labels)}
+    `;
+    const enable = wrap.querySelector(".source-enable input");
+    const fieldRow = wrap.querySelector(".field-row");
+    const syncEnable = () => {
+      fieldRow.classList.toggle("disabled", !enable.checked);
+      fieldRow.querySelectorAll("input").forEach((inp) => {
+        inp.disabled = !enable.checked;
+      });
+    };
+    enable.addEventListener("change", syncEnable);
+    syncEnable();
+    return wrap;
+  }
+
   async function loadShares() {
     sources = await api("/v1/admin/sources");
     const calBox = $("calendars-list");
@@ -111,22 +169,10 @@
     calBox.innerHTML = "";
     listBox.innerHTML = "";
     for (const c of sources.calendars || []) {
-      const lab = document.createElement("label");
-      lab.innerHTML = `<input type="checkbox" data-kind="calendar" data-id="${c.id}" data-title="${escapeAttr(
-        c.title || c.id
-      )}" ${c.shared ? "checked" : ""}/><span>${escapeHtml(c.title || c.id)}</span><span class="meta">${escapeHtml(
-        c.source_name || ""
-      )}</span>`;
-      calBox.appendChild(lab);
+      calBox.appendChild(renderSourceRow("calendar", c, CAL_FIELD_LABELS));
     }
     for (const l of sources.reminder_lists || []) {
-      const lab = document.createElement("label");
-      lab.innerHTML = `<input type="checkbox" data-kind="reminder_list" data-id="${l.id}" data-title="${escapeAttr(
-        l.title || l.id
-      )}" ${l.shared ? "checked" : ""}/><span>${escapeHtml(l.title || l.id)}</span><span class="meta">${escapeHtml(
-        l.source_name || ""
-      )}</span>`;
-      listBox.appendChild(lab);
+      listBox.appendChild(renderSourceRow("reminder_list", l, REM_FIELD_LABELS));
     }
     const shared =
       (sources.calendars || []).some((c) => c.shared) ||
@@ -140,14 +186,36 @@
     const lists = [];
     const calTitles = {};
     const listTitles = {};
-    document.querySelectorAll("#calendars-list input:checked").forEach((el) => {
-      cals.push(el.dataset.id);
-      calTitles[el.dataset.id] = el.dataset.title;
+    const calendarSyncFields = {};
+    const reminderSyncFields = {};
+
+    document.querySelectorAll("#calendars-list .source-card").forEach((card) => {
+      const enable = card.querySelector(".source-enable input");
+      const id = enable.dataset.id;
+      if (enable.checked) {
+        cals.push(id);
+        calTitles[id] = enable.dataset.title;
+      }
+      const fields = {};
+      card.querySelectorAll(".field-row input[data-field]").forEach((inp) => {
+        fields[inp.dataset.field] = !!inp.checked;
+      });
+      calendarSyncFields[id] = fields;
     });
-    document.querySelectorAll("#lists-list input:checked").forEach((el) => {
-      lists.push(el.dataset.id);
-      listTitles[el.dataset.id] = el.dataset.title;
+    document.querySelectorAll("#lists-list .source-card").forEach((card) => {
+      const enable = card.querySelector(".source-enable input");
+      const id = enable.dataset.id;
+      if (enable.checked) {
+        lists.push(id);
+        listTitles[id] = enable.dataset.title;
+      }
+      const fields = {};
+      card.querySelectorAll(".field-row input[data-field]").forEach((inp) => {
+        fields[inp.dataset.field] = !!inp.checked;
+      });
+      reminderSyncFields[id] = fields;
     });
+
     try {
       await api("/v1/admin/share", {
         method: "PUT",
@@ -156,6 +224,8 @@
           shared_reminder_lists: lists,
           calendar_titles: calTitles,
           reminder_titles: listTitles,
+          calendar_sync_fields: calendarSyncFields,
+          reminder_sync_fields: reminderSyncFields,
         }),
       });
       toast("Shares saved");

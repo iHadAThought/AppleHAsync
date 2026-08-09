@@ -119,7 +119,17 @@ class AppleHASyncCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # Full create-style fields that are present
             return {k: v for k, v in new_item.items() if k != "uid" and v is not None}
         patch: dict[str, Any] = {}
-        for key in ("summary", "description", "status", "due", "priority"):
+        for key in (
+            "summary",
+            "description",
+            "status",
+            "due",
+            "priority",
+            "location",
+            "url",
+            "flagged",
+            "tags",
+        ):
             if key in new_item and new_item[key] != old.get(key):
                 patch[key] = new_item[key]
         return patch

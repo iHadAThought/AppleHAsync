@@ -13,6 +13,7 @@ Setup and operations live in BookStack: **[appleHAsync](https://bookstack.ghostn
 | `custom_components/apple_hasync/` | Home Assistant integration (`calendar` + `todo`) |
 | `shared/` | Shared domain models / backend protocol |
 | `deploy/install-mac-agent.sh` | One-click Mac installer |
+| `deploy/update-mac-agent.sh` | One-click Mac update / patch |
 | `deploy/uninstall-mac-agent.sh` | One-click Mac uninstaller |
 
 ## One-click Mac install
@@ -53,6 +54,19 @@ PURGE=1 ~/appleHAsync/deploy/uninstall-mac-agent.sh --force
 ```
 
 Then remove **Apple HA Sync** under HA → Settings → Devices & services if desired.
+
+## One-click Mac update
+
+```bash
+~/appleHAsync/deploy/update-mac-agent.sh
+```
+
+Pulls from Forgejo, refreshes the venv, rebuilds `appleHAsync.app`, restarts the LaunchAgent. Config/secrets/shares are kept.
+
+```bash
+# Also repair stale EventKit share IDs (if HA entities went unavailable):
+~/appleHAsync/deploy/update-mac-agent.sh --repair-shares
+```
 
 ## Manual / advanced Mac commands
 

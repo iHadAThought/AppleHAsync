@@ -193,3 +193,5 @@ echo
 echo "==> Next: share calendars/lists, register HA, add integration in HA UI"
 echo "    ${BIN} share list"
 echo "    ${BIN} ha add --name Home --url https://HA:8123 --token … --webhook-id … --webhook-secret …"
+echo
+echo "==> Later updates:  ${INSTALL_DIR}/deploy/update-mac-agent.sh"

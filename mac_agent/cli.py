@@ -123,8 +123,10 @@ def cmd_ha_list(_args: argparse.Namespace) -> int:
 
 def cmd_ha_add(args: argparse.Namespace) -> int:
     store = ConfigStore()
-    if args.url.startswith("http://") and not store.config.allow_insecure_http:
-        print("HTTPS required (or set allow_insecure_http in config)", file=sys.stderr)
+    if args.url.startswith("http://") and not (
+        store.config.allow_insecure_http or args.insecure
+    ):
+        print("HTTPS required (or pass --insecure / set allow_insecure_http)", file=sys.stderr)
         return 1
     target = HomeAssistantTarget(
         id=str(uuid.uuid4()),
@@ -193,7 +195,7 @@ def cmd_ha_test(args: argparse.Namespace) -> int:
             token=ha.token,
             verify_tls=ha.verify_tls,
             ca_path=ha.ca_path,
-            allow_insecure_http=store.config.allow_insecure_http,
+            allow_insecure_http=store.config.allow_insecure_http or not ha.verify_tls,
         )
     )
     print(json.dumps(result, indent=2))

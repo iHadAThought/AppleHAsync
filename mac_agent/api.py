@@ -243,9 +243,15 @@ async def health():
 @app.get("/v1/calendars", dependencies=[Depends(require_auth)])
 async def list_calendars():
     _require_calendar_perm()
-    cfg = get_store().config
+    st = get_store()
+    cfg = st.config
+    live = backend.list_calendars()
+    stale_c, _ = cfg.prune_missing_shares({c.id for c in live}, set(cfg.shared_reminder_lists))
+    if stale_c:
+        st.save()
+        _LOGGER.warning("Pruned stale shared calendar IDs: %s", stale_c)
     items = []
-    for cal in backend.list_calendars():
+    for cal in live:
         if not cfg.is_calendar_shared(cal.id):
             continue
         cal.shared = True
@@ -256,9 +262,15 @@ async def list_calendars():
 @app.get("/v1/reminder-lists", dependencies=[Depends(require_auth)])
 async def list_reminder_lists():
     _require_reminders_perm()
-    cfg = get_store().config
+    st = get_store()
+    cfg = st.config
+    live = backend.list_reminder_lists()
+    _, stale_l = cfg.prune_missing_shares(set(cfg.shared_calendars), {lst.id for lst in live})
+    if stale_l:
+        st.save()
+        _LOGGER.warning("Pruned stale shared reminder list IDs: %s", stale_l)
     items = []
-    for lst in backend.list_reminder_lists():
+    for lst in live:
         if not cfg.is_list_shared(lst.id):
             continue
         lst.shared = True
@@ -514,7 +526,10 @@ async def admin_ha_list():
 @app.post("/v1/admin/home-assistants", dependencies=[Depends(require_auth)])
 async def admin_ha_create(body: HaCreate):
     st = get_store()
-    if body.base_url.startswith("http://") and not st.config.allow_insecure_http:
+    # HTTP HA is allowed when agent allow_insecure_http is on, or this target disables TLS verify (lab LAN).
+    if body.base_url.startswith("http://") and not (
+        st.config.allow_insecure_http or not body.verify_tls
+    ):
         raise HTTPException(status_code=400, detail="https_required")
     import secrets
     import uuid
@@ -544,7 +559,10 @@ async def admin_ha_update(key: str, body: HaUpdate):
     updates = body.model_dump(exclude_unset=True)
     if "base_url" in updates and updates["base_url"]:
         updates["base_url"] = updates["base_url"].rstrip("/")
-        if updates["base_url"].startswith("http://") and not st.config.allow_insecure_http:
+        verify = updates.get("verify_tls", ha.verify_tls)
+        if updates["base_url"].startswith("http://") and not (
+            st.config.allow_insecure_http or not verify
+        ):
             raise HTTPException(status_code=400, detail="https_required")
     data.update(updates)
     updated = HomeAssistantTarget.from_dict(data)
@@ -570,7 +588,7 @@ async def admin_ha_test(key: str):
         token=ha.token,
         verify_tls=ha.verify_tls,
         ca_path=ha.ca_path,
-        allow_insecure_http=st.config.allow_insecure_http,
+        allow_insecure_http=st.config.allow_insecure_http or not ha.verify_tls,
     )
     return result
 

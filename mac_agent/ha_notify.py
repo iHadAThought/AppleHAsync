@@ -48,5 +48,5 @@ class HaNotifier:
             payload=body,
             verify_tls=ha.verify_tls,
             ca_path=ha.ca_path,
-            allow_insecure_http=cfg.allow_insecure_http,
+            allow_insecure_http=cfg.allow_insecure_http or not ha.verify_tls,
         )

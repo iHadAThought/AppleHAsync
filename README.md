@@ -13,6 +13,7 @@ Setup and operations live in BookStack: **[appleHAsync](https://bookstack.ghostn
 | `custom_components/apple_hasync/` | Home Assistant integration (`calendar` + `todo`) |
 | `shared/` | Shared domain models / backend protocol |
 | `deploy/install-mac-agent.sh` | One-click Mac installer |
+| `deploy/uninstall-mac-agent.sh` | One-click Mac uninstaller |
 
 ## One-click Mac install
 
@@ -42,6 +43,16 @@ Approve **Calendars** and **Reminders** Full Access for **appleHAsync** when pro
 ~/Applications/appleHAsync.app/Contents/MacOS/appleHAsync share list
 ~/Applications/appleHAsync.app/Contents/MacOS/appleHAsync token show
 ```
+
+## One-click Mac uninstall
+
+```bash
+~/appleHAsync/deploy/uninstall-mac-agent.sh
+# Full wipe (app + LaunchAgent + code + Application Support + TCC):
+PURGE=1 ~/appleHAsync/deploy/uninstall-mac-agent.sh --force
+```
+
+Then remove **Apple HA Sync** under HA → Settings → Devices & services if desired.
 
 ## Manual / advanced Mac commands
 

@@ -88,6 +88,22 @@ class AgentConfig:
     def is_list_shared(self, list_id: str) -> bool:
         return list_id in self.shared_reminder_lists
 
+    def prune_missing_shares(
+        self, calendar_ids: set[str], list_ids: set[str]
+    ) -> tuple[list[str], list[str]]:
+        """Drop share allowlist entries that no longer exist in EventKit."""
+        stale_c = [i for i in self.shared_calendars if i not in calendar_ids]
+        stale_l = [i for i in self.shared_reminder_lists if i not in list_ids]
+        if stale_c:
+            self.shared_calendars = [
+                i for i in self.shared_calendars if i in calendar_ids
+            ]
+        if stale_l:
+            self.shared_reminder_lists = [
+                i for i in self.shared_reminder_lists if i in list_ids
+            ]
+        return stale_c, stale_l
+
 
 class ConfigStore:
     def __init__(self, data_dir: Path | None = None) -> None:

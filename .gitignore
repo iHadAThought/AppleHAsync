@@ -1,0 +1,19 @@
+# Local secrets / runtime data (never commit)
+**/secrets.yaml
+**/.DS_Store
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.env
+logs/
+*.sqlite3
+*.sqlite3-*
+
+# Generated TLS material under Application Support is outside the repo;
+# ignore any local copies
+mac_agent/certs/
+*.key
+*.crt
+*.pem

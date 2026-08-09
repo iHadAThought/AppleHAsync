@@ -1,0 +1,13 @@
+{
+  "domain": "apple_hasync",
+  "name": "Apple HA Sync",
+  "codeowners": ["@iHadAThought"],
+  "config_flow": true,
+  "documentation": "https://bookstack.ghostnetwork.app/books/applehasync",
+  "iot_class": "local_polling",
+  "version": "0.1.0",
+  "integration_type": "service",
+  "requirements": [],
+  "dependencies": ["webhook"],
+  "after_dependencies": []
+}

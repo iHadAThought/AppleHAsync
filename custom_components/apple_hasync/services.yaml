@@ -1,0 +1,10 @@
+get_pairing_info:
+  name: Get pairing info
+  description: Return webhook_id and webhook_secret for registering this HA instance on the Mac agent.
+  fields:
+    entry_id:
+      name: Config entry ID
+      description: Optional; defaults to the first apple_hasync entry.
+      required: false
+      selector:
+        text:

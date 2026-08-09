@@ -1,0 +1,49 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to Mac appleHAsync agent",
+        "description": "Use the HTTPS URL and agent token from the Mac Mini. CalDAV is reserved for later.",
+        "data": {
+          "backend": "Backend",
+          "agent_url": "Agent base URL",
+          "agent_token": "Agent bearer token",
+          "verify_tls": "Verify TLS certificate",
+          "ca_path": "Custom CA path (optional)",
+          "cert_pin": "Certificate SHA-256 pin (optional)",
+          "allow_insecure_http": "Allow insecure HTTP (lab only)"
+        }
+      },
+      "sources": {
+        "title": "Select shared sources",
+        "description": "Only calendars and reminder lists shared on the Mac are listed. You may narrow further here.",
+        "data": {
+          "selected_calendars": "Calendars",
+          "selected_lists": "Reminder lists"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Could not connect to the Mac agent",
+      "invalid_auth": "Invalid agent token",
+      "permission_required": "Mac Calendar/Reminders permission missing — grant access on the Mac",
+      "https_required": "HTTPS is required unless insecure HTTP is explicitly allowed"
+    },
+    "abort": {
+      "already_configured": "This agent URL is already configured",
+      "caldav_not_available": "CalDAV / iCloud backend is not available yet"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Apple HA Sync options",
+        "data": {
+          "scan_interval": "Poll interval (seconds)",
+          "selected_calendars": "Calendars",
+          "selected_lists": "Reminder lists"
+        }
+      }
+    }
+  }
+}

@@ -113,10 +113,21 @@
             <label>Allowed source IPs (comma-separated, empty = any)
               <input id="allowed-ips" placeholder="homeassistant.local, 192.168.1.0/24" />
             </label>
-            <p class="muted">Listen/TLS changes need a LaunchAgent restart (<code>update-mac-agent.sh</code> or kickstart).</p>
+            <p class="muted">Listen/TLS changes need a LaunchAgent restart (use Update below, or kickstart).</p>
             <p class="err" id="agent-err" hidden></p>
             <button type="submit" class="primary">Save agent settings</button>
           </form>
+          <div class="box">
+            <h2>Update</h2>
+            <p class="muted">Pull latest code, refresh dependencies, rebuild the app, and restart the agent. Config and shares are kept.</p>
+            <p id="update-version" class="mono-line">Version: —</p>
+            <label class="check"><input type="checkbox" id="update-repair-shares" /> Also repair shares after update</label>
+            <p class="err" id="update-err" hidden></p>
+            <p class="muted" id="update-status"></p>
+            <div class="row">
+              <button type="button" class="primary" id="btn-update">Update agent</button>
+            </div>
+          </div>
           <div class="box">
             <h2>Token</h2>
             <div class="token-row">

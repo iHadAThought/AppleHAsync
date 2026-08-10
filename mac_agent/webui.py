@@ -9,7 +9,9 @@ from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+from . import __version__
 from .config import ConfigStore
+from . import self_update
 
 WEB_DIR = Path(__file__).resolve().parent / "web"
 
@@ -25,6 +27,10 @@ class SettingsUpdate(BaseModel):
     allow_insecure_http: bool | None = None
     allowed_source_ips: list[str] | None = None
     setup_completed: bool | None = None
+
+
+class UpdateRequest(BaseModel):
+    repair_shares: bool = False
 
 
 def build_ui_router(
@@ -98,6 +104,9 @@ def build_ui_router(
             "allowed_source_ips": list(cfg.allowed_source_ips),
             "setup_completed": bool(getattr(cfg, "setup_completed", False)),
             "tls_configured": bool(cfg.tls_cert_file and cfg.tls_key_file),
+            "version": __version__,
+            "git_revision": self_update.git_revision(),
+            "update_available": self_update.update_script_path().is_file(),
             "agent_token_hint": (cfg.agent_token[:4] + "…" + cfg.agent_token[-4:])
             if len(cfg.agent_token) > 8
             else "••••",
@@ -105,6 +114,26 @@ def build_ui_router(
                 "Changing listen_host/port requires restarting the appleHAsync LaunchAgent."
             ),
         }
+
+    @router.get("/v1/admin/update", dependencies=[Depends(require_auth)])
+    async def admin_update_status():
+        data = self_update.status()
+        data["version"] = __version__
+        return data
+
+    @router.post("/v1/admin/update", dependencies=[Depends(require_auth)])
+    async def admin_update_start(body: UpdateRequest):
+        """Run deploy/update-mac-agent.sh (git pull, rebuild, LaunchAgent restart).
+
+        Auth-gated; argv is fixed (optional --repair-shares only). The process is
+        detached after a short delay so this response can finish before restart.
+        """
+        try:
+            return self_update.start_update(repair_shares=bool(body.repair_shares))
+        except ValueError as exc:
+            detail = str(exc) or "update_failed"
+            code = 409 if detail == "update_already_running" else 400
+            raise HTTPException(status_code=code, detail=detail) from exc
 
     @router.put("/v1/admin/settings", dependencies=[Depends(require_auth)])
     async def admin_settings_put(body: SettingsUpdate):

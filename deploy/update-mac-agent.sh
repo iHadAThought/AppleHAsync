@@ -56,6 +56,14 @@ if [[ -n "$SCRIPT_SRC" && -f "$SCRIPT_SRC" ]]; then
   fi
 fi
 
+# Prefer existing origin remote (Forgejo/GitHub) over REPO_URL default when pulling
+if [[ -d "$INSTALL_DIR/.git" ]]; then
+  ORIGIN_URL="$(git -C "$INSTALL_DIR" remote get-url origin 2>/dev/null || true)"
+  if [[ -n "$ORIGIN_URL" ]]; then
+    REPO_URL="$ORIGIN_URL"
+  fi
+fi
+
 echo "==> appleHAsync Mac agent updater"
 echo "    install: $INSTALL_DIR"
 echo "    app:     $APP_DIR"

@@ -17,6 +17,7 @@ try:
 except ImportError:  # pragma: no cover
     from homeassistant.helpers.service import SupportsResponse  # type: ignore
 
+from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.typing import ConfigType
 
 from .const import CONF_WEBHOOK_SECRET, DOMAIN
@@ -24,9 +25,12 @@ from .coordinator import AppleHASyncCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
+# Config-entry only — no YAML configuration supported.
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
+
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
-    """Set up from YAML is not supported."""
+    """Register services; entities come from config entries only."""
 
     async def _pairing_info(call: ServiceCall) -> dict:
         entry_id = call.data.get("entry_id")

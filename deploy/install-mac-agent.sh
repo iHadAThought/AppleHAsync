@@ -65,6 +65,11 @@ if [[ ! -d "$INSTALL_DIR/mac_agent" ]]; then
   exit 1
 fi
 
+# After clone/copy so curl|bash also has deploy/_python_version_check.sh
+# shellcheck disable=SC1091
+source "$INSTALL_DIR/deploy/_python_version_check.sh"
+applehasync_require_python "$PYTHON_BIN"
+
 cd "$INSTALL_DIR"
 export APPLE_HASYNC_ROOT="$INSTALL_DIR"
 export APPLE_HASYNC_DATA_DIR="$DATA_DIR"

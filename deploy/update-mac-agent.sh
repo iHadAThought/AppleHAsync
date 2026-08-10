@@ -33,6 +33,9 @@ SKIP_APP="${SKIP_APP:-0}"
 SKIP_RESTART="${SKIP_RESTART:-0}"
 REPAIR_SHARES="${REPAIR_SHARES:-0}"
 
+# shellcheck disable=SC1091
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_python_version_check.sh"
+
 for arg in "$@"; do
   case "$arg" in
     --skip-pull) SKIP_PULL=1 ;;
@@ -68,6 +71,7 @@ echo "==> appleHAsync Mac agent updater"
 echo "    install: $INSTALL_DIR"
 echo "    app:     $APP_DIR"
 echo "    data:    $DATA_DIR (preserved)"
+applehasync_require_python "$PYTHON_BIN"
 
 if [[ ! -d "$INSTALL_DIR/mac_agent" ]]; then
   echo "ERROR: $INSTALL_DIR/mac_agent missing." >&2

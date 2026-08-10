@@ -26,6 +26,7 @@ HACS installs **only** the Home Assistant component. The Mac agent requires clon
 ## Requirements
 
 - macOS 13+ with Calendar and Reminders **Full Access** for **appleHAsync**
+- **Python 3.10+** on the Mac (`python3`). Apple Command Line Tools often ship 3.9 — use Homebrew (`brew install python@3.12`) or [python.org](https://www.python.org/downloads/) if needed. Override with `PYTHON_BIN=/path/to/python3.12`.
 - Home Assistant **2025.12+** (options flow API)
 - Network path between the Mac agent and Home Assistant
 

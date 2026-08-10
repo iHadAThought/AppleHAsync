@@ -7,11 +7,11 @@ import logging
 import threading
 import time
 from pathlib import Path
-from typing import Any, Awaitable, Callable
+from typing import Any, Awaitable, Callable, Optional
 
 _LOGGER = logging.getLogger(__name__)
 
-NotifyFn = Callable[[str, dict[str, Any] | None], Awaitable[Any]]
+NotifyFn = Callable[[str, Optional[dict[str, Any]]], Awaitable[Any]]
 
 
 class ChangeWatcher:

@@ -286,3 +286,11 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .toast.show { display: block; }
 
 code { font-family: var(--mono); font-size: 0.86em; }
+
+.mono-line {
+  font-family: var(--mono);
+  font-size: 0.86rem;
+  color: var(--muted);
+  margin: 0.35rem 0 0.75rem;
+}
+

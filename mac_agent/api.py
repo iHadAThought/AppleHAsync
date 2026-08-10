@@ -274,7 +274,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="appleHAsync Mac Agent",
-    version="0.1.5",
+    version="0.1.6",
     lifespan=lifespan,
     # Production agent: do not expose interactive OpenAPI docs.
     docs_url=None,
@@ -297,12 +297,15 @@ mount_static(app)
 @app.get("/health")
 async def health():
     """Unauthenticated liveness — keep the payload minimal (no share/HA recon)."""
+    from . import __version__
+
     perms = backend.get_permissions().to_dict() if backend else {
         "calendar": "unavailable",
         "reminders": "unavailable",
     }
     return {
         "ok": True,
+        "version": __version__,
         "backend": "eventkit" if backend else None,
         "permissions": perms,
     }

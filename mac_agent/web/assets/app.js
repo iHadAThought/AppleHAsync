@@ -59,7 +59,8 @@
     try {
       const h = await fetch("/health").then((r) => r.json());
       const pill = $("health-pill");
-      pill.textContent = h.ok ? "Agent OK" : "Agent issue";
+      const ver = h.version ? ` · v${h.version}` : "";
+      pill.textContent = (h.ok ? "Agent OK" : "Agent issue") + ver;
       pill.className = `pill ${h.ok ? "ok" : "bad"}`;
       return h;
     } catch {
@@ -276,6 +277,30 @@
     $("listen-port").value = s.listen_port || 8745;
     $("allow-insecure").checked = !!s.allow_insecure_http;
     $("allowed-ips").value = (s.allowed_source_ips || []).join(", ");
+    const rev = s.git_revision ? ` (${s.git_revision})` : "";
+    $("update-version").textContent = `Version: ${s.version || "?"}${rev}`;
+    $("btn-update").disabled = s.update_available === false;
+    if (s.update_available === false) {
+      $("update-status").textContent = "Updater script not found in this install.";
+    }
+  }
+
+  async function waitForAgentBack(timeoutMs = 180000) {
+    const start = Date.now();
+    let sawDown = false;
+    while (Date.now() - start < timeoutMs) {
+      await new Promise((r) => setTimeout(r, 2000));
+      const h = await refreshHealth();
+      if (!h || !h.ok) {
+        sawDown = true;
+        $("update-status").textContent = "Agent restarting…";
+        continue;
+      }
+      if (sawDown || Date.now() - start > 8000) {
+        return h;
+      }
+    }
+    return null;
   }
 
   function fillHaForm(ha) {
@@ -538,6 +563,40 @@
     $("setup-token").textContent = token;
     $("agent-token").textContent = token;
     toast("Token rotated");
+  });
+
+  $("btn-update").addEventListener("click", async () => {
+    $("update-err").hidden = true;
+    const repair = $("update-repair-shares").checked;
+    const msg = repair
+      ? "Update the Mac agent now (git pull, rebuild, restart) and repair shares?"
+      : "Update the Mac agent now (git pull, rebuild, restart)? Config and shares are kept.";
+    if (!confirm(msg)) return;
+    $("btn-update").disabled = true;
+    $("update-status").textContent = "Starting update…";
+    try {
+      const r = await api("/v1/admin/update", {
+        method: "POST",
+        body: JSON.stringify({ repair_shares: repair }),
+      });
+      $("update-status").textContent = r.message || "Update started — waiting for restart…";
+      toast("Update started");
+      const back = await waitForAgentBack();
+      if (back) {
+        await loadAgentSettings();
+        $("update-status").textContent = `Update finished — running v${back.version || "?"}.`;
+        toast("Agent back online");
+      } else {
+        $("update-status").textContent =
+          "Timed out waiting for agent. Check launchctl / logs/ui-update.log on the Mac.";
+      }
+    } catch (e) {
+      $("update-err").hidden = false;
+      $("update-err").textContent = e.message;
+      $("update-status").textContent = "";
+    } finally {
+      $("btn-update").disabled = false;
+    }
   });
 
   init();

@@ -4,5 +4,7 @@ httpx>=0.27
 pyyaml>=6.0
 cryptography>=42.0
 pydantic>=2.0
+# Safety net if someone forces Python 3.9; installer requires 3.10+.
+eval_type_backport>=0.2.0; python_version < "3.10"
 pyobjc-framework-EventKit>=10.0; sys_platform == "darwin"
 pyobjc-framework-Cocoa>=10.0; sys_platform == "darwin"

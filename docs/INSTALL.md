@@ -36,7 +36,15 @@ What you get:
 
 Grant **Calendars** and **Reminders** Full Access to **appleHAsync** when macOS prompts you.
 
-Useful overrides: `REPO_URL`, `INSTALL_DIR`, `LISTEN_HOST`, `LISTEN_PORT`.
+**Python:** 3.10 or newer is required. If `python3 --version` shows 3.9 (common with Command Line Tools only):
+
+```bash
+brew install python@3.12
+PYTHON_BIN="$(brew --prefix python@3.12)/bin/python3.12" LISTEN_HOST=0.0.0.0 \
+  ~/appleHAsync/deploy/install-mac-agent.sh
+```
+
+Useful overrides: `REPO_URL`, `INSTALL_DIR`, `LISTEN_HOST`, `LISTEN_PORT`, `PYTHON_BIN`.
 
 ### Settings UI (first run)
 
@@ -44,6 +52,14 @@ Useful overrides: `REPO_URL`, `INSTALL_DIR`, `LISTEN_HOST`, `LISTEN_PORT`.
 2. **Shares** — enable calendars / reminder lists; choose which details sync per source
 3. **Home Assistant** — enter HA URL + long-lived token → Test connection → Save
 4. After HA pairing, add webhook id/secret from `apple_hasync.get_pairing_info`
+
+![Setup tab](images/ui/01-setup.png)
+
+![Shares tab](images/ui/02-shares.png)
+
+![Home Assistant tab](images/ui/03-home-assistant.png)
+
+![Agent tab with Update](images/ui/04-agent.png)
 
 ## 2. Install the Home Assistant integration
 

@@ -44,6 +44,23 @@ def _nsdate_to_dt(nsdate: Any) -> datetime | None:
         return None
 
 
+def _nsdate_to_calendar_date(nsdate: Any) -> date | None:
+    """Calendar day for all-day EventKit dates (not wall-clock after UTC→local).
+
+    EventKit stores all-day start/end as midnight-GMT floating dates (end exclusive).
+    Converting via ``.astimezone().date()`` shifts the day in US timezones
+    (e.g. Aug 22 00:00 UTC → Aug 21 evening EDT → HA exclusive end drops a day).
+    Use the UTC calendar day so exclusive ends match Calendar.app / HA.
+    """
+    if nsdate is None:
+        return None
+    try:
+        ts = float(nsdate.timeIntervalSince1970())
+        return datetime.fromtimestamp(ts, tz=timezone.utc).date()
+    except Exception:
+        return None
+
+
 def _cgcolor_to_hex(cg: Any) -> str | None:
     """Convert EventKit CGColor / NSColor to #RRGGBB for Home Assistant."""
     if cg is None:
@@ -315,8 +332,8 @@ def _dt_to_nsdate(value: datetime | date, EventKit: Any) -> Any:
         if value.tzinfo is None:
             value = value.astimezone()
         return NSDate.dateWithTimeIntervalSince1970_(value.timestamp())
-    # all-day date → midnight local
-    dt = datetime(value.year, value.month, value.day)
+    # All-day bare date → midnight GMT (EventKit floating all-day convention).
+    dt = datetime(value.year, value.month, value.day, tzinfo=timezone.utc)
     return NSDate.dateWithTimeIntervalSince1970_(dt.timestamp())
 
 
@@ -511,12 +528,18 @@ class EventKitBackend:
             location = _eventkit_location_string(ev)
             url = _eventkit_url_string(ev)
             all_day = bool(ev.isAllDay())
-            start_dt = _nsdate_to_dt(ev.startDate())
-            end_dt = _nsdate_to_dt(ev.endDate())
-            if start_dt is None or end_dt is None:
-                continue
-            start_val: datetime | date = start_dt.date() if all_day else start_dt
-            end_val: datetime | date = end_dt.date() if all_day else end_dt
+            if all_day:
+                start_val = _nsdate_to_calendar_date(ev.startDate())
+                end_val = _nsdate_to_calendar_date(ev.endDate())
+                if start_val is None or end_val is None:
+                    continue
+            else:
+                start_dt = _nsdate_to_dt(ev.startDate())
+                end_dt = _nsdate_to_dt(ev.endDate())
+                if start_dt is None or end_dt is None:
+                    continue
+                start_val = start_dt
+                end_val = end_dt
             lm = _nsdate_to_dt(ev.lastModifiedDate()) if ev.lastModifiedDate() else None
             ch = content_hash_for(
                 uid,
@@ -757,10 +780,16 @@ class EventKitBackend:
         location = _eventkit_location_string(ev)
         url = _eventkit_url_string(ev)
         all_day = bool(ev.isAllDay())
-        start_dt = _nsdate_to_dt(ev.startDate()) or datetime.now().astimezone()
-        end_dt = _nsdate_to_dt(ev.endDate()) or (start_dt + timedelta(hours=1))
-        start_val: datetime | date = start_dt.date() if all_day else start_dt
-        end_val: datetime | date = end_dt.date() if all_day else end_dt
+        if all_day:
+            start_val = _nsdate_to_calendar_date(ev.startDate()) or date.today()
+            end_val = _nsdate_to_calendar_date(ev.endDate()) or (
+                start_val + timedelta(days=1)
+            )
+        else:
+            start_dt = _nsdate_to_dt(ev.startDate()) or datetime.now().astimezone()
+            end_dt = _nsdate_to_dt(ev.endDate()) or (start_dt + timedelta(hours=1))
+            start_val = start_dt
+            end_val = end_dt
         return Event(
             uid=uid,
             calendar_id=calendar_id,

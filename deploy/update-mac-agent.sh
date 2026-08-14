@@ -25,7 +25,7 @@ REPO_URL="${REPO_URL:-https://github.com/iHadAThought/AppleHAsync.git}"
 INSTALL_DIR="${INSTALL_DIR:-$HOME/appleHAsync}"
 APP_DIR="${APP_DIR:-$HOME/Applications/appleHAsync.app}"
 DATA_DIR="${APPLE_HASYNC_DATA_DIR:-$HOME/Library/Application Support/appleHAsync}"
-PYTHON_BIN="${PYTHON_BIN:-python3}"
+PYTHON_BIN="${PYTHON_BIN:-}"
 BRANCH="${BRANCH:-}"
 SKIP_PULL="${SKIP_PULL:-0}"
 SKIP_DEPS="${SKIP_DEPS:-0}"
@@ -71,6 +71,19 @@ echo "==> appleHAsync Mac agent updater"
 echo "    install: $INSTALL_DIR"
 echo "    app:     $APP_DIR"
 echo "    data:    $DATA_DIR (preserved)"
+
+# Auto-pick ≥3.10 when PYTHON_BIN unset or when default python3 is too old (CLT 3.9).
+RESOLVED="$(applehasync_resolve_python "${PYTHON_BIN:-}" "$INSTALL_DIR" || true)"
+if [[ -n "$RESOLVED" ]]; then
+  if [[ -n "${PYTHON_BIN:-}" && "$RESOLVED" != "$PYTHON_BIN" ]]; then
+    echo "    PYTHON_BIN=$PYTHON_BIN is unsuitable; using $RESOLVED"
+  elif [[ -z "${PYTHON_BIN:-}" ]]; then
+    echo "    selected Python: $RESOLVED"
+  fi
+  PYTHON_BIN="$RESOLVED"
+else
+  PYTHON_BIN="${PYTHON_BIN:-python3}"
+fi
 applehasync_require_python "$PYTHON_BIN"
 
 if [[ ! -d "$INSTALL_DIR/mac_agent" ]]; then

@@ -282,7 +282,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="appleHAsync Mac Agent",
-    version="0.1.8",
+    version="0.1.9",
     lifespan=lifespan,
     # Production agent: do not expose interactive OpenAPI docs.
     docs_url=None,

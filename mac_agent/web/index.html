@@ -77,6 +77,18 @@
           <h2>Reminder lists</h2>
           <p class="muted">Always syncs title and completion. Optional: notes, due, priority, flag, location, URL, tags.</p>
           <div id="lists-list" class="source-list"></div>
+          <h2>Focus Mode</h2>
+          <p class="muted">Mac → Home Assistant only (read). Requires <strong>Full Disk Access</strong> for appleHAsync so the agent can read the Focus database. Cross-device Focus may lag or miss local Assertions.</p>
+          <div class="box" id="focus-share-box">
+            <label class="check">
+              <input type="checkbox" id="share-focus" />
+              Sync Focus Mode
+            </label>
+            <p class="muted" id="focus-status">—</p>
+            <div class="row">
+              <button type="button" class="ghost" id="btn-open-fda">Open Full Disk Access</button>
+            </div>
+          </div>
         </section>
 
         <section class="panel tab-panel" id="tab-ha">

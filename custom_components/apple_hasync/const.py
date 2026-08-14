@@ -19,4 +19,4 @@ BACKEND_CALDAV = "caldav"
 DEFAULT_SCAN_INTERVAL = 30
 DEFAULT_VERIFY_TLS = True
 
-PLATFORMS = ["calendar", "todo"]
+PLATFORMS = ["calendar", "todo", "sensor", "binary_sensor"]

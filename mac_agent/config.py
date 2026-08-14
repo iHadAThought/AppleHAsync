@@ -116,6 +116,8 @@ class AgentConfig:
     allowed_source_ips: list[str] = field(default_factory=list)
     shared_calendars: list[str] = field(default_factory=list)
     shared_reminder_lists: list[str] = field(default_factory=list)
+    # Fail-closed: Focus Mode is not shared until explicitly enabled.
+    share_focus: bool = False
     # Per-source field allowlists (id -> {field: bool}); missing id = all enabled.
     calendar_sync_fields: dict[str, dict[str, bool]] = field(default_factory=dict)
     reminder_sync_fields: dict[str, dict[str, bool]] = field(default_factory=dict)
@@ -131,6 +133,9 @@ class AgentConfig:
 
     def is_list_shared(self, list_id: str) -> bool:
         return list_id in self.shared_reminder_lists
+
+    def is_focus_shared(self) -> bool:
+        return bool(self.share_focus)
 
     def calendar_fields(self, calendar_id: str) -> dict[str, bool]:
         return normalize_calendar_sync_fields(
@@ -236,6 +241,7 @@ class ConfigStore:
             allowed_source_ips=list(raw.get("allowed_source_ips") or []),
             shared_calendars=list(raw.get("shared_calendars") or []),
             shared_reminder_lists=list(raw.get("shared_reminder_lists") or []),
+            share_focus=bool(raw.get("share_focus", False)),
             calendar_sync_fields=calendar_sync_fields,
             reminder_sync_fields=reminder_sync_fields,
             home_assistants=ha_list,
@@ -261,6 +267,7 @@ class ConfigStore:
             "allowed_source_ips": self._config.allowed_source_ips,
             "shared_calendars": self._config.shared_calendars,
             "shared_reminder_lists": self._config.shared_reminder_lists,
+            "share_focus": bool(self._config.share_focus),
             "calendar_sync_fields": self._config.calendar_sync_fields,
             "reminder_sync_fields": self._config.reminder_sync_fields,
             "calendar_titles": self._config.calendar_titles,
@@ -310,6 +317,7 @@ class ConfigStore:
         *,
         calendar_ids: list[str] | None = None,
         list_ids: list[str] | None = None,
+        share_focus: bool | None = None,
         calendar_titles: dict[str, str] | None = None,
         reminder_titles: dict[str, str] | None = None,
         calendar_sync_fields: dict[str, dict[str, bool]] | None = None,
@@ -319,6 +327,8 @@ class ConfigStore:
             self._config.shared_calendars = list(dict.fromkeys(calendar_ids))
         if list_ids is not None:
             self._config.shared_reminder_lists = list(dict.fromkeys(list_ids))
+        if share_focus is not None:
+            self._config.share_focus = bool(share_focus)
         if calendar_titles:
             self._config.calendar_titles.update(calendar_titles)
         if reminder_titles:
@@ -366,6 +376,10 @@ class ConfigStore:
         self._config.shared_reminder_lists = [
             c for c in self._config.shared_reminder_lists if c != list_id
         ]
+        self.save()
+
+    def set_share_focus(self, enabled: bool) -> None:
+        self._config.share_focus = bool(enabled)
         self.save()
 
     def upsert_ha(self, target: HomeAssistantTarget) -> HomeAssistantTarget:

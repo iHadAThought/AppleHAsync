@@ -77,7 +77,7 @@ def build_ui_router(
                 pass
         setup_needed = not bool(getattr(cfg, "setup_completed", False))
         if not cfg.home_assistants and not (
-            cfg.shared_calendars or cfg.shared_reminder_lists
+            cfg.shared_calendars or cfg.shared_reminder_lists or cfg.share_focus
         ):
             setup_needed = True
         return {
@@ -91,6 +91,7 @@ def build_ui_router(
             "permissions": perms,
             "shared_calendars": len(cfg.shared_calendars),
             "shared_reminder_lists": len(cfg.shared_reminder_lists),
+            "share_focus": bool(cfg.share_focus),
             "home_assistants": len(cfg.home_assistants),
         }
 

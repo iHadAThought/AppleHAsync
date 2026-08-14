@@ -180,6 +180,9 @@ class AppleHASyncClient:
     async def delete_item(self, list_id: str, uid: str) -> None:
         await self._request("DELETE", f"/v1/lists/{list_id}/items/{uid}")
 
+    async def get_focus(self) -> dict[str, Any]:
+        return await self._request("GET", "/v1/focus")
+
 
 def _iso(value: datetime | date) -> str:
     return value.isoformat()

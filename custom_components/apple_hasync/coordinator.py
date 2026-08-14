@@ -100,10 +100,25 @@ class AppleHASyncCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 _LOGGER.warning("Failed to fetch list %s: %s", lst["id"], err)
                 todo_items[lst["id"]] = []
 
+        focus: dict[str, Any] | None = None
+        try:
+            focus = await self.client.get_focus()
+        except KeyError:
+            # Not shared (404) — fail closed; no Focus entities.
+            focus = None
+        except AppleHASyncPermissionError as err:
+            # Unexpected for Focus; treat as unavailable this cycle.
+            _LOGGER.debug("Focus fetch permission error: %s", err)
+            focus = None
+        except Exception as err:
+            _LOGGER.warning("Failed to fetch Focus status: %s", err)
+            focus = None
+
         return {
             "calendars": {c["id"]: c for c in calendars},
             "lists": {lst["id"]: lst for lst in lists},
             "todo_items": todo_items,
+            "focus": focus,
         }
 
     @callback

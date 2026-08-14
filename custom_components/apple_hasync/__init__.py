@@ -96,7 +96,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     }
 
     await hass.config_entries.async_forward_entry_setups(
-        entry, [Platform.CALENDAR, Platform.TODO]
+        entry, [Platform.CALENDAR, Platform.TODO, Platform.SENSOR, Platform.BINARY_SENSOR]
     )
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
     return True
@@ -108,7 +108,7 @@ async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> Non
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     unload_ok = await hass.config_entries.async_unload_platforms(
-        entry, [Platform.CALENDAR, Platform.TODO]
+        entry, [Platform.CALENDAR, Platform.TODO, Platform.SENSOR, Platform.BINARY_SENSOR]
     )
     data = hass.data[DOMAIN].pop(entry.entry_id, None)
     if data and data.get("webhook_id"):

@@ -97,7 +97,8 @@
     const p = await api("/v1/admin/permissions");
     const cal = p.calendar || "?";
     const rem = p.reminders || "?";
-    $("perms-status").textContent = `Calendar: ${cal} · Reminders: ${rem}`;
+    const focus = p.focus || "?";
+    $("perms-status").textContent = `Calendar: ${cal} · Reminders: ${rem} · Focus (FDA): ${focus}`;
     const ok =
       (cal === "authorized" || cal === "full_access") &&
       (rem === "authorized" || rem === "full_access");
@@ -175,9 +176,22 @@
     for (const l of sources.reminder_lists || []) {
       listBox.appendChild(renderSourceRow("reminder_list", l, REM_FIELD_LABELS));
     }
+    const focus = sources.focus || {};
+    $("share-focus").checked = !!(sources.share_focus || focus.shared);
+    const perm = focus.permission || "?";
+    let focusLine = `Full Disk Access: ${perm}`;
+    if (sources.share_focus || focus.shared) {
+      if (focus.active && focus.mode_name) {
+        focusLine += ` · Active: ${focus.mode_name}`;
+      } else if (perm === "ok") {
+        focusLine += " · Active: off";
+      }
+    }
+    $("focus-status").textContent = focusLine;
     const shared =
       (sources.calendars || []).some((c) => c.shared) ||
-      (sources.reminder_lists || []).some((l) => l.shared);
+      (sources.reminder_lists || []).some((l) => l.shared) ||
+      !!(sources.share_focus || focus.shared);
     $("check-shares").className = shared ? "done" : "bad";
   }
 
@@ -223,6 +237,7 @@
         body: JSON.stringify({
           shared_calendars: cals,
           shared_reminder_lists: lists,
+          share_focus: !!$("share-focus").checked,
           calendar_titles: calTitles,
           reminder_titles: listTitles,
           calendar_sync_fields: calendarSyncFields,
@@ -406,6 +421,14 @@
       body: JSON.stringify({ action: "open_settings", which: "both" }),
     });
     toast("Opened Privacy settings");
+  });
+
+  $("btn-open-fda").addEventListener("click", async () => {
+    await api("/v1/admin/permissions", {
+      method: "POST",
+      body: JSON.stringify({ action: "open_settings", which: "full_disk_access" }),
+    });
+    toast("Opened Full Disk Access");
   });
 
   $("btn-copy-token").addEventListener("click", async () => {

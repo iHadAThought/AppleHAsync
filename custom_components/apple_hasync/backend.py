@@ -37,6 +37,8 @@ class BackendClient(Protocol):
 
     async def delete_item(self, list_id: str, uid: str) -> None: ...
 
+    async def get_focus(self) -> dict[str, Any]: ...
+
 
 class CalDAVBackendClient:
     """Reserved stub — not shipped in the public v1 UI (Local Mac Agent only)."""

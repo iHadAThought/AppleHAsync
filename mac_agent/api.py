@@ -104,10 +104,15 @@ def get_store() -> ConfigStore:
 class ShareUpdate(BaseModel):
     shared_calendars: list[str] | None = None
     shared_reminder_lists: list[str] | None = None
+    share_focus: bool | None = None
     calendar_titles: dict[str, str] | None = None
     reminder_titles: dict[str, str] | None = None
     calendar_sync_fields: dict[str, dict[str, bool]] | None = None
     reminder_sync_fields: dict[str, dict[str, bool]] | None = None
+
+
+class FocusShareUpdate(BaseModel):
+    shared: bool
 
 
 class ShareToggle(BaseModel):
@@ -263,6 +268,9 @@ async def lifespan(app: FastAPI):
         reload_config=lambda: store.reload() if store else None,
         notify=_notify,
         eventkit_backend=backend,
+        focus_share_enabled=lambda: bool(
+            store and store.config.is_focus_shared()
+        ),
     )
     watcher.start(asyncio.get_running_loop())
     yield
@@ -274,7 +282,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="appleHAsync Mac Agent",
-    version="0.1.7",
+    version="0.1.8",
     lifespan=lifespan,
     # Production agent: do not expose interactive OpenAPI docs.
     docs_url=None,
@@ -302,7 +310,15 @@ async def health():
     perms = backend.get_permissions().to_dict() if backend else {
         "calendar": "unavailable",
         "reminders": "unavailable",
+        "focus": "unavailable",
     }
+    if backend is None:
+        try:
+            from .focus_backend import focus_permission_status
+
+            perms["focus"] = focus_permission_status()
+        except Exception:
+            pass
     return {
         "ok": True,
         "version": __version__,
@@ -347,6 +363,24 @@ async def list_reminder_lists():
         lst.shared = True
         items.append(lst.to_dict())
     return {"reminder_lists": items}
+
+
+@app.get("/v1/focus", dependencies=[Depends(require_auth)])
+async def get_focus():
+    """Current Focus Mode status (Mac → HA). Fail-closed unless share_focus."""
+    cfg = get_store().config
+    if not cfg.is_focus_shared():
+        raise HTTPException(status_code=404, detail="not_shared")
+    from .focus_backend import read_focus_status
+
+    status = read_focus_status(shared=True)
+    # Avoid logging mode names at INFO (privacy).
+    _LOGGER.debug(
+        "Focus status read permission=%s active=%s",
+        status.permission,
+        status.active,
+    )
+    return status.to_dict()
 
 
 @app.get("/v1/calendars/{calendar_id}/events", dependencies=[Depends(require_auth)])
@@ -537,8 +571,27 @@ async def admin_sources():
     return {
         "calendars": calendars,
         "reminder_lists": lists,
+        "share_focus": bool(cfg.share_focus),
+        "focus": _admin_focus_summary(cfg),
         "calendar_field_keys": list(CALENDAR_SYNC_FIELDS),
         "reminder_field_keys": list(REMINDER_SYNC_FIELDS),
+    }
+
+
+def _admin_focus_summary(cfg) -> dict:
+    from .focus_backend import read_focus_status
+
+    status = read_focus_status(shared=bool(cfg.share_focus))
+    # Admin UI needs enough to show share toggle + FDA hint; avoid dumping schedules.
+    return {
+        "shared": bool(cfg.share_focus),
+        "permission": status.permission,
+        "active": status.active,
+        "mode_name": status.mode_name if cfg.share_focus else None,
+        "mode_id": status.mode_id if cfg.share_focus else None,
+        "available_modes": (
+            [m.to_dict() for m in status.available_modes] if cfg.share_focus else []
+        ),
     }
 
 
@@ -548,6 +601,7 @@ async def admin_share(body: ShareUpdate):
     st.set_share(
         calendar_ids=body.shared_calendars,
         list_ids=body.shared_reminder_lists,
+        share_focus=body.share_focus,
         calendar_titles=body.calendar_titles,
         reminder_titles=body.reminder_titles,
         calendar_sync_fields=body.calendar_sync_fields,
@@ -558,9 +612,21 @@ async def admin_share(body: ShareUpdate):
     return {
         "shared_calendars": st.config.shared_calendars,
         "shared_reminder_lists": st.config.shared_reminder_lists,
+        "share_focus": st.config.share_focus,
         "calendar_sync_fields": st.config.calendar_sync_fields,
         "reminder_sync_fields": st.config.reminder_sync_fields,
     }
+
+
+@app.put("/v1/admin/focus/share", dependencies=[Depends(require_auth)])
+async def admin_focus_share(body: FocusShareUpdate):
+    st = get_store()
+    st.set_share_focus(body.shared)
+    if notifier:
+        await notifier.notify_refresh(
+            "share_changed", {"focus": True, "shared": body.shared}
+        )
+    return {"share_focus": st.config.share_focus, "focus": _admin_focus_summary(st.config)}
 
 
 @app.put("/v1/admin/share/toggle", dependencies=[Depends(require_auth)])
@@ -599,6 +665,11 @@ async def admin_permissions_action(body: PermissionsAction):
         perms = await backend.request_permissions()
         return perms.to_dict()
     if body.action == "open_settings":
+        if body.which in ("focus", "full_disk", "full_disk_access", "fda"):
+            from .focus_backend import open_full_disk_access_settings
+
+            open_full_disk_access_settings()
+            return {"ok": True, "action": "open_settings"}
         backend.open_privacy_settings(body.which)
         return {"ok": True, "action": "open_settings"}
     if body.action == "reset":

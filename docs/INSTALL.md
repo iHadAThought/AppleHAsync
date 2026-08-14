@@ -36,6 +36,8 @@ What you get:
 
 Grant **Calendars** and **Reminders** Full Access to **appleHAsync** when macOS prompts you.
 
+For **Focus Mode** sync (optional): also grant **Full Disk Access** to **appleHAsync**, then enable **Sync Focus Mode** on the Shares tab. Without FDA, Focus stays unavailable (fail-closed). Mac is master — this release only reads Focus into HA (`sensor` + `binary_sensor`); it does not set Focus from HA. Cross-device Focus may lag or miss local Assertions.
+
 **Python:** 3.10 or newer is required. If `python3 --version` shows 3.9 (common with Command Line Tools only):
 
 ```bash
@@ -49,7 +51,7 @@ Useful overrides: `REPO_URL`, `INSTALL_DIR`, `LISTEN_HOST`, `LISTEN_PORT`, `PYTH
 ### Settings UI (first run)
 
 1. **Setup** — request permissions; copy agent token for HA
-2. **Shares** — enable calendars / reminder lists; choose which details sync per source
+2. **Shares** — enable calendars / reminder lists (and optionally **Sync Focus Mode**); choose which details sync per calendar/list
 3. **Home Assistant** — enter HA URL + long-lived token → Test connection → Save
 4. After HA pairing, add webhook id/secret from `apple_hasync.get_pairing_info`
 
@@ -127,6 +129,7 @@ Then in HA: Settings → Devices & services → Apple HA Sync → Delete. Remove
 |---------|----------------|
 | Gear icon → config flow 500 | Update to integration ≥ 0.1.3 (OptionsFlow fix for HA 2025.12+) |
 | Entities unavailable | Mac shares enabled? TCC Full Access for appleHAsync? Agent reachable? |
+| Focus sensor unavailable / `permission: denied` | Grant **Full Disk Access** to **appleHAsync**, enable Sync Focus Mode, reload HA |
 | SSL wrong version number | HA using HTTPS against an HTTP agent (or vice versa) |
 | Stale calendars after iCloud | `update-mac-agent.sh --repair-shares` then Configure/Reload in HA |
 | Agent not reachable from HA | `LISTEN_HOST=0.0.0.0`, firewall, and optional IP allowlist |
@@ -139,3 +142,5 @@ Logs (Mac): `~/appleHAsync/logs/agent.out.log` and `agent.err.log`.
 - Do not expose the agent without a strong token; use `allowed_source_ips` when binding non-loopback
 - Webhook HMAC is required — empty secrets are rejected
 - Loopback `/v1/setup/bootstrap` returns the agent token only on `127.0.0.1` / `::1`
+- Shares (calendars, lists, Focus) are fail-closed — nothing is exposed until enabled; Focus additionally needs Full Disk Access and is never logged at INFO with mode names
+- Full Disk Access is powerful: grant it only to **appleHAsync.app**, not a random Python interpreter

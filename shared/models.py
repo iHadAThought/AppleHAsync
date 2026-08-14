@@ -17,9 +17,15 @@ class TodoItemStatus(str, Enum):
 class PermissionStatus:
     calendar: str  # not_determined | restricted | denied | write_only | full_access
     reminders: str
+    # Focus / DoNotDisturb DB readability (Full Disk Access): ok | denied | unavailable
+    focus: str = "unavailable"
 
     def to_dict(self) -> dict[str, str]:
-        return {"calendar": self.calendar, "reminders": self.reminders}
+        return {
+            "calendar": self.calendar,
+            "reminders": self.reminders,
+            "focus": self.focus,
+        }
 
     @property
     def calendar_ok(self) -> bool:
@@ -62,6 +68,38 @@ class ReminderList:
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+
+@dataclass
+class FocusModeInfo:
+    id: str
+    name: str
+
+    def to_dict(self) -> dict[str, str]:
+        return {"id": self.id, "name": self.name}
+
+
+@dataclass
+class FocusStatus:
+    """Current macOS Focus (Do Not Disturb) status — Mac is master."""
+
+    active: bool
+    mode_id: str | None = None
+    mode_name: str | None = None
+    available_modes: list[FocusModeInfo] = field(default_factory=list)
+    # ok | denied | unavailable
+    permission: str = "unavailable"
+    shared: bool = False
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "active": self.active,
+            "mode_id": self.mode_id,
+            "mode_name": self.mode_name,
+            "available_modes": [m.to_dict() for m in self.available_modes],
+            "permission": self.permission,
+            "shared": self.shared,
+        }
 
 
 @dataclass

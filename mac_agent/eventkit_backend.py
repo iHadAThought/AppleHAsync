@@ -369,9 +369,12 @@ class EventKitBackend:
             )
         else:
             cal = rem = 0
+        from .focus_backend import focus_permission_status
+
         return PermissionStatus(
             calendar=_STATUS_MAP.get(cal, f"unknown_{cal}"),
             reminders=_STATUS_MAP.get(rem, f"unknown_{rem}"),
+            focus=focus_permission_status(),
         )
 
     async def request_permissions(self) -> PermissionStatus:
@@ -438,6 +441,10 @@ class EventKitBackend:
         if which in ("both", "reminders"):
             urls.append(
                 "x-apple.systempreferences:com.apple.preference.security?Privacy_Reminders"
+            )
+        if which in ("focus", "full_disk", "full_disk_access", "fda"):
+            urls.append(
+                "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles"
             )
         for url in urls:
             subprocess.run(["open", url], check=False)

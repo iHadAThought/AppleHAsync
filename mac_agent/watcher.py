@@ -15,7 +15,7 @@ NotifyFn = Callable[[str, Optional[dict[str, Any]]], Awaitable[Any]]
 
 
 class ChangeWatcher:
-    """Debounced EventKit + config.yaml watcher."""
+    """Debounced EventKit + config.yaml + Focus DB watcher."""
 
     def __init__(
         self,
@@ -25,12 +25,16 @@ class ChangeWatcher:
         notify: NotifyFn,
         debounce_seconds: float = 1.5,
         eventkit_backend: Any | None = None,
+        focus_share_enabled: Callable[[], bool] | None = None,
+        focus_poll_seconds: float = 2.0,
     ) -> None:
         self._config_path = config_path
         self._reload_config = reload_config
         self._notify = notify
         self._debounce = debounce_seconds
         self._backend = eventkit_backend
+        self._focus_share_enabled = focus_share_enabled or (lambda: False)
+        self._focus_poll_seconds = focus_poll_seconds
         self._loop: asyncio.AbstractEventLoop | None = None
         self._stop = threading.Event()
         self._threads: list[threading.Thread] = []
@@ -38,6 +42,7 @@ class ChangeWatcher:
         self._pending_details: dict[str, Any] | None = None
         self._flush_handle: asyncio.TimerHandle | None = None
         self._config_mtime: float | None = None
+        self._focus_mtimes: dict[str, float] = {}
         self._observer: Any = None
 
     def start(self, loop: asyncio.AbstractEventLoop) -> None:
@@ -47,6 +52,11 @@ class ChangeWatcher:
         t = threading.Thread(target=self._config_poll_loop, name="applehasync-config", daemon=True)
         t.start()
         self._threads.append(t)
+        ft = threading.Thread(
+            target=self._focus_poll_loop, name="applehasync-focus", daemon=True
+        )
+        ft.start()
+        self._threads.append(ft)
         if self._backend is not None:
             try:
                 self._start_eventkit_observer()
@@ -110,6 +120,36 @@ class ChangeWatcher:
                     self._schedule_notify("config_reloaded")
             except Exception as exc:
                 _LOGGER.debug("Config poll error: %s", exc)
+
+    def _focus_signature(self) -> dict[str, float]:
+        from .focus_backend import dnd_watch_paths
+
+        sig: dict[str, float] = {}
+        for path in dnd_watch_paths():
+            key = str(path)
+            try:
+                sig[key] = path.stat().st_mtime if path.exists() else -1.0
+            except OSError:
+                sig[key] = -1.0
+        return sig
+
+    def _focus_poll_loop(self) -> None:
+        """Poll DoNotDisturb DB mtimes when Focus sharing is enabled."""
+        while not self._stop.wait(self._focus_poll_seconds):
+            try:
+                if not self._focus_share_enabled():
+                    self._focus_mtimes = {}
+                    continue
+                sig = self._focus_signature()
+                if not self._focus_mtimes:
+                    self._focus_mtimes = sig
+                    continue
+                if sig != self._focus_mtimes:
+                    self._focus_mtimes = sig
+                    _LOGGER.debug("Focus DB change detected")
+                    self._schedule_notify("focus_changed")
+            except Exception as exc:
+                _LOGGER.debug("Focus poll error: %s", exc)
 
     def _start_eventkit_observer(self) -> None:
         """Observe EKEventStoreChangedNotification on a background runloop thread."""

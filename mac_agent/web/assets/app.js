@@ -99,11 +99,14 @@
     const rem = p.reminders || "?";
     const focus = p.focus || "?";
     $("perms-status").textContent = `Calendar: ${cal} · Reminders: ${rem} · Focus (FDA): ${focus}`;
-    const ok =
-      (cal === "authorized" || cal === "full_access") &&
-      (rem === "authorized" || rem === "full_access");
-    $("check-perms").className = ok ? "done" : "bad";
-    return ok;
+    const calOk =
+      cal === "authorized" || cal === "full_access";
+    const remOk =
+      rem === "authorized" || rem === "full_access";
+    $("check-perms").className = calOk && remOk ? "done" : "bad";
+    const fdaOk = focus === "ok";
+    $("check-fda").className = fdaOk ? "done" : "bad";
+    return calOk && remOk;
   }
 
   const CAL_FIELD_LABELS = {
@@ -305,6 +308,31 @@
     let sawDown = false;
     while (Date.now() - start < timeoutMs) {
       await new Promise((r) => setTimeout(r, 2000));
+      // Detect updater failure without restart (e.g. Python too old)
+      try {
+        const st = await api("/v1/admin/update");
+        const last = st.last || {};
+        if (last.state === "failed") {
+          const detail =
+            last.error ||
+            (last.exit_code != null ? `exit ${last.exit_code}` : "unknown error");
+          const tail = (st.log_tail || []).slice(-8).join("\n");
+          return {
+            ok: false,
+            update_failed: true,
+            detail,
+            log_tail: tail,
+            version: null,
+          };
+        }
+        if (last.state === "completed" && !sawDown) {
+          // Script finished without taking us down — treat as success path.
+          const h = await refreshHealth();
+          if (h && h.ok) return h;
+        }
+      } catch (_) {
+        /* agent may be restarting */
+      }
       const h = await refreshHealth();
       if (!h || !h.ok) {
         sawDown = true;
@@ -411,7 +439,7 @@
       method: "POST",
       body: JSON.stringify({ action: "request", which: "both" }),
     });
-    toast("Permission request sent");
+    toast("Calendar & Reminders request sent");
     await loadPerms();
   });
 
@@ -423,13 +451,21 @@
     toast("Opened Privacy settings");
   });
 
-  $("btn-open-fda").addEventListener("click", async () => {
+  async function openFullDiskAccess() {
     await api("/v1/admin/permissions", {
       method: "POST",
       body: JSON.stringify({ action: "open_settings", which: "full_disk_access" }),
     });
-    toast("Opened Full Disk Access");
+    toast("Opened Full Disk Access — enable appleHAsync, then Refresh status");
+  }
+
+  $("btn-setup-fda").addEventListener("click", openFullDiskAccess);
+  $("btn-refresh-perms").addEventListener("click", async () => {
+    await loadPerms();
+    toast("Permission status refreshed");
   });
+
+  $("btn-open-fda").addEventListener("click", openFullDiskAccess);
 
   $("btn-copy-token").addEventListener("click", async () => {
     await navigator.clipboard.writeText($("setup-token").textContent);
@@ -592,8 +628,8 @@
     $("update-err").hidden = true;
     const repair = $("update-repair-shares").checked;
     const msg = repair
-      ? "Update the Mac agent now (git pull, rebuild, restart) and repair shares?"
-      : "Update the Mac agent now (git pull, rebuild, restart)? Config and shares are kept.";
+      ? "Update the Mac agent now (git pull, rebuild, restart) and repair shares?\n\nThis does not update Home Assistant. Afterward, update the Apple HA Sync integration in HA separately (HACS), then reload."
+      : "Update the Mac agent now (git pull, rebuild, restart)? Config and shares are kept.\n\nThis does not update Home Assistant. Afterward, update the Apple HA Sync integration in HA separately (HACS), then reload.";
     if (!confirm(msg)) return;
     $("btn-update").disabled = true;
     $("update-status").textContent = "Starting update…";
@@ -605,10 +641,19 @@
       $("update-status").textContent = r.message || "Update started — waiting for restart…";
       toast("Update started");
       const back = await waitForAgentBack();
-      if (back) {
+      if (back && back.update_failed) {
+        $("update-err").hidden = false;
+        $("update-err").textContent =
+          `Update failed (${back.detail}).` +
+          (back.log_tail ? `\n${back.log_tail}` : "");
+        $("update-status").textContent =
+          "Mac agent was not restarted. Fix the error above (often need Python 3.10+ / Homebrew), then try Update again.";
+        toast("Update failed");
+      } else if (back && back.ok) {
         await loadAgentSettings();
-        $("update-status").textContent = `Update finished — running v${back.version || "?"}.`;
-        toast("Agent back online");
+        $("update-status").textContent =
+          `Update finished — Mac agent v${back.version || "?"}. Update the Home Assistant integration separately (HACS), then reload HA.`;
+        toast("Agent back online — update HA separately");
       } else {
         $("update-status").textContent =
           "Timed out waiting for agent. Check launchctl / logs/ui-update.log on the Mac.";

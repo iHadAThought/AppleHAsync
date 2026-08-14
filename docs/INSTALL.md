@@ -36,7 +36,7 @@ What you get:
 
 Grant **Calendars** and **Reminders** Full Access to **appleHAsync** when macOS prompts you.
 
-For **Focus Mode** sync (optional): also grant **Full Disk Access** to **appleHAsync**, then enable **Sync Focus Mode** on the Shares tab. Without FDA, Focus stays unavailable (fail-closed). Mac is master — this release only reads Focus into HA (`sensor` + `binary_sensor`); it does not set Focus from HA. Cross-device Focus may lag or miss local Assertions.
+For **Focus Mode** sync (optional): also grant **Full Disk Access** to **appleHAsync** during Setup (or System Settings → Privacy & Security → Full Disk Access), then enable **Sync Focus Mode** on the Shares tab. Without FDA, Focus stays unavailable (fail-closed). Mac is master — this release only reads Focus into HA (`sensor` + `binary_sensor`); it does not set Focus from HA. Cross-device Focus may lag or miss local Assertions.
 
 **Python:** 3.10 or newer is required. If `python3 --version` shows 3.9 (common with Command Line Tools only):
 
@@ -50,7 +50,7 @@ Useful overrides: `REPO_URL`, `INSTALL_DIR`, `LISTEN_HOST`, `LISTEN_PORT`, `PYTH
 
 ### Settings UI (first run)
 
-1. **Setup** — request permissions; copy agent token for HA
+1. **Setup** — request Calendar/Reminders; open Full Disk Access for Focus (optional); copy agent token for HA
 2. **Shares** — enable calendars / reminder lists (and optionally **Sync Focus Mode**); choose which details sync per calendar/list
 3. **Home Assistant** — enter HA URL + long-lived token → Test connection → Save
 4. After HA pairing, add webhook id/secret from `apple_hasync.get_pairing_info`
@@ -101,6 +101,8 @@ Restart Home Assistant, then Add integration as above.
 
 ### Mac agent
 
+Settings UI → **Agent** → **Update agent**, or:
+
 ```bash
 ~/appleHAsync/deploy/update-mac-agent.sh
 # After iCloud share-ID churn:
@@ -108,6 +110,8 @@ Restart Home Assistant, then Add integration as above.
 ```
 
 Config, secrets, and shares are preserved. If you previously used bundle id `app.ghostnetwork.appleHAsync`, the updater removes the old LaunchAgent — re-approve Calendar/Reminders for **appleHAsync** if entities go unavailable.
+
+**The Mac Update button does not update Home Assistant.** Update the integration separately (below).
 
 ### Home Assistant
 

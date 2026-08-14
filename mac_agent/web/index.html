@@ -43,12 +43,21 @@
           <p class="lede">Grant access, pick what to sync, then connect Home Assistant.</p>
           <ol class="checklist" id="setup-checklist">
             <li id="check-perms">Calendar &amp; Reminders permission</li>
-            <li id="check-shares">At least one shared calendar or list</li>
+            <li id="check-fda">Full Disk Access (Focus Mode sync)</li>
+            <li id="check-shares">At least one shared calendar, list, or Focus</li>
             <li id="check-ha">Home Assistant registered</li>
           </ol>
           <div class="row">
-            <button type="button" class="primary" id="btn-request-perms">Request permissions</button>
+            <button type="button" class="primary" id="btn-request-perms">Request Calendar &amp; Reminders</button>
             <button type="button" class="ghost" id="btn-open-privacy">Open Privacy settings</button>
+          </div>
+          <div class="box">
+            <h2>Full Disk Access (Focus)</h2>
+            <p class="muted">Optional but recommended if you want Focus Mode in Home Assistant. Enable <strong>appleHAsync</strong> under System Settings → Privacy &amp; Security → Full Disk Access, then return here.</p>
+            <div class="row">
+              <button type="button" class="primary" id="btn-setup-fda">Open Full Disk Access</button>
+              <button type="button" class="ghost" id="btn-refresh-perms">Refresh status</button>
+            </div>
           </div>
           <p class="muted" id="perms-status"></p>
           <div class="box">
@@ -131,7 +140,8 @@
           </form>
           <div class="box">
             <h2>Update</h2>
-            <p class="muted">Pull latest code, refresh dependencies, rebuild the app, and restart the agent. Config and shares are kept.</p>
+            <p class="muted">Pull latest code, refresh dependencies, rebuild the app, and restart the <strong>Mac agent</strong>. Config and shares are kept.</p>
+            <p class="muted"><strong>Home Assistant is not updated by this button.</strong> After the agent updates, update the Apple HA Sync integration separately (HACS or replace <code>custom_components/apple_hasync</code>), then reload/restart HA.</p>
             <p id="update-version" class="mono-line">Version: —</p>
             <label class="check"><input type="checkbox" id="update-repair-shares" /> Also repair shares after update</label>
             <p class="err" id="update-err" hidden></p>
